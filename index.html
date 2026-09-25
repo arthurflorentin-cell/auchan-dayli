@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Auchan Dayli</title>
+<title>Auchan Daily</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <style>html,body{margin:0}</style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Onest:wght@400;500;600;700&display=swap">
@@ -255,6 +255,7 @@ h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:
 .ess{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:14px;display:flex;flex-direction:column;gap:10px}
 .ess-top{display:flex;gap:12px;align-items:center}
 .ess-top .prod-img{width:48px;height:48px;font-size:26px}
+.ess-top .between{flex-wrap:wrap;row-gap:4px}
 .gauge{height:10px;border-radius:6px;background:var(--line);position:relative;overflow:hidden}
 .gauge i{position:absolute;inset:0 auto 0 0;border-radius:6px}
 .pantry{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -491,6 +492,7 @@ const P = {
   detergent:{n:'Liquid detergent',u:'1.5 L · 16 loads',p:7.90,a:'household',e:'🧴',per:16},
   detergentXL:{n:'Liquid detergent XL',u:'3 L · 32 loads',p:13.90,a:'household',e:'🧴',per:32},
   soap:{n:'Liquid hand soap',u:'500 ml',p:2.10,a:'household',e:'🧼'},
+  dishtabs:{n:'Dishwasher tablets',u:'pack of 40',p:7.95,a:'household',e:'🍽️'},
   soapRefill:{n:'Hand soap refill',u:'1 L',p:3.20,a:'household',e:'🧼'},
   dogfood:{n:'Adult dog kibble',u:'3 kg bag',p:14.90,a:'pets',e:'🦴'},
   dogtreats:{n:'Dental dog chews',u:'pack of 7',p:3.50,a:'pets',e:'🐕'},
@@ -524,21 +526,30 @@ const MEALS = {
 const DEFAULT_PLAN = ['lemonchicken','spinachpenne','curry','salmon','fajitas'];
 const SWAPS = ['burgers','tomatopenne','omelette','lemonchicken','spinachpenne','curry','salmon','fajitas'];
 const ALT = {coffee:'coffeeB',coffeeB:'coffee',pasta:'pastaB',pastaB:'pasta',soap:'soapRefill',soapRefill:'soap',detergent:'detergentXL',detergentXL:'detergent'};
-const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+const DAYS_EN = ['Mon','Tue','Wed','Thu','Fri'], DAYS_FR=['Lun','Mar','Mer','Jeu','Ven'];
+const DAYS = new Proxy([], {get:(t,k)=>(S.lang==='fr'?DAYS_FR:DAYS_EN)[k]});
 const ESS_DEF = {
-  dogfood:{label:'Dog food',basis:'1 dog · usual 3 kg bag'},
-  detergent:{label:'Laundry detergent',basis:'4 loads a week · 1.5 L bottle'},
-  soap:{label:'Liquid hand soap',basis:'2 adults · 500 ml bottle'},
+  dogfood:{label:['Dog food','Croquettes pour chien']},
+  detergent:{label:['Laundry detergent','Lessive']},
+  soap:{label:['Liquid hand soap','Savon liquide']},
+  dishtabs:{label:['Dishwasher tablets','Tablettes lave-vaisselle']},
 };
+function essLabel(id){ const c=S.custom&&S.custom[id]; if(c) return c.n; return L(...ESS_DEF[id].label); }
+function essBasis(id){ const c=S.custom&&S.custom[id]; const h=S.hh;
+  if(c) return L(`Added by you · ${c.store}`,`Ajouté par vous · ${c.store}`);
+  return ({dogfood:L('1 dog · usual 3 kg bag','1 chien · sac habituel de 3 kg'),detergent:L(`${h.laundry} loads a week · 1.5 L bottle`,`${h.laundry} lessives/semaine · bidon 1,5 L`),soap:L(`${h.adults+h.kids} people · 500 ml bottle`,`${h.adults+h.kids} personnes · flacon 500 ml`),dishtabs:L(`${h.dishRuns} cycles a week · pack of 40`,`${h.dishRuns} cycles/semaine · boîte de 40`)})[id]; }
+function essOn(id){ if(id==='dogfood') return S.hh.dog; if(id==='dishtabs') return S.hh.dishwasher; return true; }
+const L=(en,fr)=>S&&S.lang==='fr'?fr:en;
+function registerCustom(){ Object.entries(S.custom||{}).forEach(([id,c])=>{ P[id]={n:c.n,u:c.q||c.store,p:0,a:c.kind==='food'?'pantry':'household',e:c.e||'📦',custom:true}; }); }
 
 /* ================= STATE ================= */
-const KEY='dayli-demo-v1';
+const KEY='daily-demo-v2';
 function freshState(){
   return {
-    onboarded:false, country:'FR',
-    hh:{adults:2,kids:0,dog:true,cat:false,cooking:'most',laundry:4,prep:30},
+    onboarded:false, country:'FR', lang:null, name:'Léa', custom:{},
+    hh:{adults:2,kids:0,dog:true,cat:false,cooking:'most',laundry:4,prep:30,dishwasher:true,dishRuns:5},
     budget:65,
-    ess:{ dogfood:{dur:21,opened:18,remind:true}, detergent:{dur:28,opened:20,remind:true}, soap:{dur:14,opened:5,remind:true} },
+    ess:{ dogfood:{dur:21,opened:18,remind:true}, detergent:{dur:28,opened:20,remind:true}, soap:{dur:14,opened:5,remind:true}, dishtabs:{dur:56,opened:44,remind:true} },
     day:0,
     pantry:[
       {id:'spinach',q:'300 g bag',exp:1,src:'Bought Saturday'},
@@ -552,7 +563,7 @@ function freshState(){
     list:[{p:'bananas',q:1,ck:0},{p:'yogurt',q:1,ck:0},{p:'coffee',q:1,ck:0},{p:'apples',q:1,ck:0}],
     plan:null,
     dismissed:{}, snoozed:{},
-    notifs:[{id:'n0',title:'Welcome to Auchan Dayli',body:'Your household estimates are ready to review.',t:'Today, 8:02',read:false}],
+    notifs:[{id:'n0',title:'Welcome to Auchan Daily',body:'Your household estimates are ready to review.',t:'Today, 8:02',read:false}],
     chat:[], handover:null,
     orders:[{id:'DM-2417',when:'Yesterday · Home delivery',items:[['milk',2],['eggs',1],['bananas',1],['pasta',2],['coffee',1],['yogurt',1]],issue:null,demo:true}],
     lastOrder:null,
@@ -563,15 +574,15 @@ function freshState(){
   };
 }
 let S;
-function load(){ try{ const r=localStorage.getItem(KEY); if(r){ S=Object.assign(freshState(),JSON.parse(r)); return; } }catch(e){} S=freshState(); }
+function load(){ try{ const r=localStorage.getItem(KEY); if(r){ S=Object.assign(freshState(),JSON.parse(r)); registerCustom(); return; } }catch(e){} S=freshState(); }
 function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
 const ui={tab:'today',sheet:null,arg:null,full:null,cap:false,cat:'all',q:'',typing:false,plan:null,sel:{}};
 
 /* ================= HELPERS ================= */
 const C=()=>COUNTRIES[S.country];
-const nm=id=>C().names[id]||P[id].n;
+const nm=id=>P[id].custom?P[id].n:(S.lang==='fr'&&FR_NAMES[id])||C().names[id]||P[id].n;
 const pr=id=>Math.round(P[id].p*C().rate*100)/100;
-function money(v){ const c=C(); const r=Math.round(v*100)/100; const s=Number.isInteger(r)&&r>=20?String(r):r.toFixed(2); return c.cur==='zł'? s.replace('.',',')+' zł' : (S.country==='FR'||S.country==='ES'? '€'+s : s); }
+function money(v){ const c=C(); const r=Math.round(v*100)/100; const s=Number.isInteger(r)&&r>=20?String(r):r.toFixed(2); if(c.cur==='zł') return s.replace('.',',')+' zł'; return S.lang==='fr'? s.replace('.',',')+' €' : '€'+s; }
 const eur=v=>money(v*C().rate);
 function tile(id,size){ const a=AISLES[P[id].a]; return `<div class="prod-img" style="background:${a.t}${size?';width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*.55)+'px':''}"><span>${P[id].e}</span></div>`; }
 const inList=id=>S.list.find(l=>l.p===id);
@@ -582,9 +593,9 @@ const essTotal=()=>listTotal()-foodTotal();
 const suggestedValue=()=>S.list.filter(l=>l.src).reduce((s,l)=>s+pr(l.p)*l.q,0);
 const budget=()=>C().budget;
 function remaining(id){ const e=S.ess[id]; return Math.max(0,e.dur-e.opened-S.day); }
-function essState(id){ const r=remaining(id); if(r<=4) return ['check','Time to check']; if(r<=10) return ['low','Running low']; return ['ok','Enough for now']; }
-function daysTxt(d){ if(d<=0) return 'may already be empty'; if(d===1) return 'about 1 day'; if(d<7) return `about ${d} days`; const w=Math.round(d/7); return `about ${w} week${w>1?'s':''}`; }
-function dateIn(d){ const base=new Date(2026,8,25); base.setDate(base.getDate()+S.day+d); return base.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }
+function essState(id){ const r=remaining(id); if(r<=4) return ['check',L('Time to check','À vérifier')]; if(r<=10) return ['low',L('Running low','Bientôt épuisé')]; return ['ok',L('Enough for now','Suffisant pour l’instant')]; }
+function daysTxt(d){ if(S.lang==='fr'){ if(d<=0) return 'peut-être déjà vide'; if(d===1) return 'environ 1 jour'; if(d<7) return `environ ${d} jours`; const w=Math.round(d/7); return `environ ${w} semaine${w>1?'s':''}`; } if(d<=0) return 'may already be empty'; if(d===1) return 'about 1 day'; if(d<7) return `about ${d} days`; const w=Math.round(d/7); return `about ${w} week${w>1?'s':''}`; }
+function dateIn(d){ const base=new Date(2026,8,25); base.setDate(base.getDate()+S.day+d); return base.toLocaleDateString(S.lang==='fr'?'fr-FR':'en-GB',{weekday:'short',day:'numeric',month:'short'}); }
 function addItem(id,src,q=1,ck=0){
   const l=inList(id);
   if(l){ l.q+=q; if(src&&!l.src) l.src=src; if(ck) l.ck=1; }
@@ -611,17 +622,17 @@ function renderTop(){
 function renderTabs(){
   const n=S.list.filter(l=>!l.ck).length;
   const t=(id,label,ic)=>`<button class="tab ${ui.tab===id?'on':''}" data-a="tab" data-v="${id}" aria-current="${ui.tab===id?'page':'false'}">${ic}<span>${label}</span>${id==='list'&&n?`<span class="badge num">${n}</span>`:''}</button>`;
-  $('tabbar').innerHTML = t('today','Today',I.today)+t('shop','Shop',I.shop)+
-   `<button class="tab tab-ask ${ui.tab==='ask'?'on':''}" data-a="tab" data-v="ask" aria-label="Ask Auchan"><span class="ask-orb">${bird(38,'#fff','#E1001A')}</span><span>Ask Auchan</span></button>`+
-   t('home','My Home',I.home)+t('list','My List',I.list);
+  $('tabbar').innerHTML = t('today',L('Today','Accueil'),I.today)+t('shop',L('Shop','Courses'),I.shop)+
+   `<button class="tab tab-ask ${ui.tab==='ask'?'on':''}" data-a="tab" data-v="ask" aria-label="Ask Auchan"><span class="ask-orb">${bird(38,'#fff','#E1001A')}</span><span>${L('Ask Auchan','Assistant')}</span></button>`+
+   t('home',L('My Home','Maison'),I.home)+t('list',L('My List','Liste'),I.list);
   $('tabbar').hidden=S.storeOn;
 }
-function reviewCount(){ return Object.keys(S.ess).filter(id=>(id!=='dogfood'||S.hh.dog)&&essState(id)[0]!=='ok'&&!inList(id)&&!(id==='detergent'&&inList('detergentXL'))&&!(id==='soap'&&inList('soapRefill'))).length; }
+function reviewCount(){ return Object.keys(S.ess).filter(id=>essOn(id)&&essState(id)[0]!=='ok'&&!inList(id)&&!(id==='detergent'&&inList('detergentXL'))&&!(id==='soap'&&inList('soapRefill'))).length; }
 function capItems(){
   const it=[];
   const t=ui.tab;
   if(t==='today'||t==='home'){
-    Object.keys(S.ess).forEach(id=>{ if(id==='dogfood'&&!S.hh.dog)return; const st=essState(id); if(st[0]!=='ok'&&!inList(id)) it.push({i:P[id].e,t:`${ESS_DEF[id].label}: ${st[1].toLowerCase()} · ${daysTxt(remaining(id))} left`,a:'openEss',v:id}); });
+    Object.keys(S.ess).forEach(id=>{ if(!essOn(id))return; const st=essState(id); if(st[0]!=='ok'&&!inList(id)) it.push({i:P[id].e,t:`${essLabel(id)}: ${st[1].toLowerCase()} · ${daysTxt(remaining(id))} left`,a:'openEss',v:id}); });
   }
   if(t==='list'||t==='shop'){ it.push({i:'🚗',t:'Suggest the best day and pickup option',a:'sheet',v:'checkout'}); it.push({i:'🛒',t:'Shop this list in store',a:'store',v:''}); }
   if(t==='list'&&!inList('eggs')&&atHome('flour')) it.push({i:'🥚',t:'A cake is one ingredient away',a:'ask',v:'What can I cook with what I have?'});
@@ -652,7 +663,7 @@ function recos(){
     title: dog<=0?'Your dog food may have run out.':`Your dog food may run out in ${dog} day${dog>1?'s':''}.`,
     body:`Add your usual ${nm('dogfood').toLowerCase()} (3 kg) to your next order?`,
     prim:['Add bag · '+money(pr('dogfood')),'addDog'],edit:'dogfood',
-    why:`Estimated from the date you opened the last bag and the 3-week duration you confirmed. Dayli can’t see your actual stock.`});
+    why:`Estimated from the date you opened the last bag and the 3-week duration you confirmed. Daily can’t see your actual stock.`});
   if((!S.plan||!S.plan.added)&&!dz.plan&&!sz.plan) r.push({id:'plan',kind:'Meal plan',tileE:'🍽',tint:'#F7E7C4',
     title:`Plan five dinners within your ${money(budget())} budget.`,body:`For 2 adults, ${S.hh.prep} min or less, using the rice, onions and spinach you already have.`,
     prim:['Plan my week','sheet:plan'],edit:'plan',why:'You usually shop on Thursdays and haven’t planned dinners yet this week.'});
@@ -668,6 +679,10 @@ function recos(){
   if(soap<=4&&!inList('soap')&&!inList('soapRefill')&&!dz.soap&&!sz.soap) r.push({id:'soap',kind:'Replenish',tile:'soap',
     title:'Hand soap: time to check.',body:`Your 500 ml bottle is estimated at ${daysTxt(soap)} left.`,
     prim:['Add soap · '+money(pr('soap')),'addSoap'],edit:'soap',why:'Estimated from your usual 2-week bottle. You can adjust it in My Home.'});
+  const dt=S.hh.dishwasher?remaining('dishtabs'):99;
+  if(dt<=7&&!inList('dishtabs')&&!dz.dish&&!sz.dish) r.push({id:'dish',kind:'Replenish',tile:'dishtabs',
+    title:L('Dishwasher tablets may run out soon.','Vos tablettes lave-vaisselle vont bientôt manquer.'),body:L(`At ${S.hh.dishRuns} cycles a week, your pack has ${daysTxt(dt)} left.`,`À ${S.hh.dishRuns} cycles par semaine, il reste ${daysTxt(dt)}.`),
+    prim:[L('Add pack · ','Ajouter · ')+money(pr('dishtabs')),'addRefill:dishtabs'],edit:'dishtabs',why:L('Estimated from your usual 40-tablet pack and the cycles per week you confirmed.','Estimé à partir de votre boîte habituelle de 40 tablettes et du nombre de cycles que vous avez indiqué.')});
   return r;
 }
 function recoCard(x,i){
@@ -692,7 +707,7 @@ function renderToday(){
    <div class="btn-row"><button class="btn btn-sm btn-dark" data-a="addEggs">Add eggs · ${money(pr('eggs'))}</button><button class="btn btn-sm btn-ghost" data-a="dismiss" data-v="cake">Not now</button></div></div>`:'';
   return `<div class="stack-lg">
   <section class="hello"><span class="date">${dateIn(0)}${S.day?` · <span class="pill info">Fast-forwarded ${S.day/7} week${S.day>7?'s':''}</span>`:''}</span>
-   <h1 class="h-xl">Good morning, Léa.</h1>
+   <h1 class="h-xl">${L(`Good morning, ${esc(S.name)}.`,`Bonjour ${esc(S.name)} !`)}</h1>
    <p class="muted" style="margin:0">Here’s what matters for your household today.</p>
    <div class="hh-strip"><span class="pill">${hh}</span><span class="pill">${C().drive} · ${C().name}</span><button class="demo-tag" data-a="sheet" data-v="presenter" style="min-height:26px">University concept · Demo data · <u>Scenarios</u></button></div></section>
   <section class="stack">${r.length? r.map(recoCard).join('') : `<div class="card row">${bird(34,'#E1001A','#fff')}<div><b>You’re all set for now.</b><div class="faint">I’ll let you know when something needs a look.</div></div></div>`}
@@ -708,22 +723,23 @@ function essCard(id){
   const e=S.ess[id], r=remaining(id), st=essState(id), pct=Math.max(3,Math.round(r/e.dur*100));
   const col={ok:'var(--green)',low:'#C98A1A',check:'var(--red)'}[st[0]];
   const added = inList(id)||(id==='detergent'&&inList('detergentXL'))||(id==='soap'&&inList('soapRefill'));
-  return `<article class="ess"><div class="ess-top">${tile(id)}<div style="flex:1;min-width:0"><div class="between"><b>${ESS_DEF[id].label}</b><span class="pill ${st[0]}"><i class="pd"></i>${st[1]}</span></div><div class="faint">${ESS_DEF[id].basis}</div></div></div>
+  return `<article class="ess"><div class="ess-top">${tile(id)}<div style="flex:1;min-width:0"><div class="between"><b>${essLabel(id)}</b><span class="pill ${st[0]}"><i class="pd"></i>${st[1]}</span></div><div class="faint">${essBasis(id)}</div></div></div>
    <div class="gauge" role="img" aria-label="Estimated ${pct}% remaining"><i style="width:${pct}%;background:${col}"></i></div>
-   <p style="margin:0;font-size:13.5px">Based on your usual purchases, your ${ESS_DEF[id].label.toLowerCase()} may last ${r<=0?'— it may already be empty':daysTxt(r).replace('about','another')}. <span class="faint">Refill around ${dateIn(r)}.</span></p>
+   <p style="margin:0;font-size:13.5px">Based on your usual purchases, your ${essLabel(id).toLowerCase()} may last ${r<=0?'— it may already be empty':daysTxt(r).replace('about','another')}. <span class="faint">Refill around ${dateIn(r)}.</span></p>
    <div class="btn-row"><button class="btn btn-sm ${e.remind?'btn-soft':'btn-ghost'}" data-a="remind" data-v="${id}" aria-pressed="${e.remind}">${e.remind?'✓ Reminder on':'Remind me'}</button>
-   ${added?`<span class="btn btn-sm btn-ghost" style="color:var(--green)">✓ In your list</span>`:`<button class="btn btn-sm btn-dark" data-a="${id==='detergent'?'sheet':'addRefill'}" data-v="${id==='detergent'?'detergent':id}">Add refill</button>`}
+   ${P[id].custom?`<button class="btn btn-sm btn-dark" data-a="customBought" data-v="${id}">${L('I bought it','Je l’ai racheté')}</button><button class="btn btn-sm btn-ghost" data-a="customRemove" data-v="${id}">${L('Remove','Supprimer')}</button>`:added?`<span class="btn btn-sm btn-ghost" style="color:var(--green)">✓ In your list</span>`:`<button class="btn btn-sm btn-dark" data-a="${id==='detergent'?'sheet':'addRefill'}" data-v="${id==='detergent'?'detergent':id}">Add refill</button>`}
    <button class="btn btn-sm btn-ghost" data-a="openEss" data-v="${id}">Adjust estimate</button></div></article>`;
 }
 function renderHome(){
-  const ids=Object.keys(S.ess).filter(id=>id!=='dogfood'||S.hh.dog);
+  const ids=Object.keys(S.ess).filter(essOn);
   const pan=[...S.pantry].sort((a,b)=>(a.exp??99)-(b.exp??99));
   return `<div class="stack-lg"><section class="hello"><h1 class="h-xl">My Home</h1><p class="muted" style="margin:0">Estimated stock for your recurring essentials.</p></section>
-  <div class="why">${I.info}<span><b>How estimates work.</b> Dayli can’t see inside your cupboards. Estimates come from simulated purchase history and habits you confirmed. Correct them anytime.</span></div>
-  <section class="stack"><div class="sec-head"><h2>Household essentials</h2><button class="link" data-a="ff">Fast-forward 2 weeks</button></div>${ids.map(essCard).join('')}</section>
+  <div class="why">${I.info}<span><b>How estimates work.</b> Daily can’t see inside your cupboards. Estimates come from simulated purchase history and habits you confirmed. Correct them anytime.</span></div>
+  <section class="stack"><div class="sec-head"><h2>Household essentials</h2><button class="link" data-a="ff">Fast-forward 2 weeks</button></div>${ids.map(essCard).join('')}<button class="btn btn-line btn-block" data-a="manual" data-v="rec">+ ${L('Add a recurring item manually','Ajouter un produit récurrent à la main')}</button></section>
   <section class="stack"><div class="sec-head"><h2>Use soon</h2><span class="faint">Expiry you confirmed or simulated</span></div>
    <div class="pantry">${pan.map(x=>{ const soon=x.exp!=null&&x.exp-S.day<=2; const d=x.exp==null?null:x.exp-S.day;
     return `<button class="pan" data-a="sheet" data-v="pantry">${tile(x.id,38)}<div><b>${nm(x.id)}</b><small>${esc(x.q)}</small><br>${d==null?'<small>No date</small>':`<span class="pill ${soon?'check':d<=5?'low':'ok'}" style="margin-top:4px">${d<=0?'Check today':d===1?'Use by tomorrow':'Use within '+d+' days'}</span>`}</div></button>`;}).join('')}</div>
+   <button class="btn btn-line btn-block" data-a="manual" data-v="food">+ ${L('Add a product manually (e.g. from another store)','Ajouter un produit à la main (ex. d’un autre magasin)')}</button>
    ${atHome('spinach')?`<button class="btn btn-soft btn-block" data-a="sheet" data-v="recipe">Cook the spinach tonight</button>`:''}</section>
   <section class="card stack"><div class="between"><b>Household profile</b><button class="link" data-a="sheet" data-v="settings">Review data</button></div>
    <div class="faint">${S.hh.adults} adults · ${S.hh.dog?'1 dog · ':''}${S.hh.laundry} laundry loads/week · cooks ${({most:'most evenings',some:'a few evenings',rare:'rarely'})[S.hh.cooking]} · max ${S.hh.prep} min</div></section></div>`;
@@ -770,15 +786,15 @@ function ptile(id){
 }
 function renderShop(){
   const q=ui.q.trim().toLowerCase();
-  let ids=Object.keys(P);
+  let ids=Object.keys(P).filter(i=>!P[i].custom);
   if(ui.cat==='offers') ids=ids.filter(i=>OFFERS[i]); else if(ui.cat!=='all') ids=ids.filter(i=>P[i].a===ui.cat);
-  if(q) ids=Object.keys(P).filter(i=>nm(i).toLowerCase().includes(q)||AISLES[P[i].a].n.toLowerCase().includes(q));
+  if(q) ids=Object.keys(P).filter(i=>!P[i].custom).filter(i=>nm(i).toLowerCase().includes(q)||AISLES[P[i].a].n.toLowerCase().includes(q));
   const n=S.list.reduce((s,l)=>s+l.q,0);
   return `<div class="stack-lg"><section class="hello"><div class="between"><h1 class="h-xl">Shop</h1><span class="demo-tag">Demo catalog</span></div></section>
   <label class="composer" style="position:static;box-shadow:var(--shadow);background:#fff" for="shopq"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#857E77" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="shopq" placeholder="Search products" value="${esc(ui.q)}" autocomplete="off" aria-label="Search products"></label>
   <div class="chips" role="tablist">${CATS.map(([k,v])=>`<button class="chip ${ui.cat===k&&!q?'on':''}" data-a="cat" data-v="${k}" role="tab" aria-selected="${ui.cat===k}">${v}</button>`).join('')}</div>
   ${!q&&ui.cat==='all'?`<section class="card" style="background:var(--ink);color:#fff;display:flex;gap:14px;align-items:center"><div style="flex:1"><div class="eyebrow" style="color:#FF9AA5">Loyalty card · demo</div><b style="font-family:var(--f-display);font-size:22px" class="num">${money(S.loyalty*C().rate)}</b><div style="font-size:12.5px;color:#D5CCC5">available on your next order</div></div><div style="width:56px;height:56px;border-radius:16px;background:var(--red);display:grid;place-items:center">${bird(40)}</div></section>
-  <button class="card row" data-a="sheet" data-v="checkout" style="text-align:left;gap:12px"><div class="prod-img" style="width:46px;height:46px;background:var(--red-soft);font-size:24px"><span>🚗</span></div><div style="flex:1"><b>${C().drive} or home delivery</b><div class="faint">Next free slot suggested by Dayli · ${C().store}</div></div><span class="link">Slots</span></button>`:''}
+  <button class="card row" data-a="sheet" data-v="checkout" style="text-align:left;gap:12px"><div class="prod-img" style="width:46px;height:46px;background:var(--red-soft);font-size:24px"><span>🚗</span></div><div style="flex:1"><b>${C().drive} or home delivery</b><div class="faint">Next free slot suggested by Daily · ${C().store}</div></div><span class="link">Slots</span></button>`:''}
   <section class="stack"><div class="sec-head"><h2>${q?`Results for “${esc(ui.q)}”`:CATS.find(c=>c[0]===ui.cat)[1]}</h2><span class="faint">${ids.length} products</span></div>
    ${ids.length?`<div class="pgrid">${ids.map(ptile).join('')}</div>`:`<div class="card faint">No products match in this demo catalog. Try “pasta”, “eggs” or “detergent”.</div>`}</section>
   ${n?`<button class="btn btn-dark btn-block" data-a="tab" data-v="list">View list & cart · ${n} items · ${money(listTotal())}</button>`:''}</div>`;
@@ -825,13 +841,13 @@ const SHEETS = {
   },
   ess(){
     const id=ui.arg, e=S.ess[id], r=remaining(id);
-    const opts=[[0,'Today'],[3,'3 days ago'],[7,'1 week ago'],[14,'2 weeks ago'],[e.opened,'Current estimate']];
-    const sugg={dogfood:21,detergent:Math.round(16/S.hh.laundry*7),soap:14}[id];
-    return sheetFrame('Adjust estimate',`<div class="row">${tile(id)}<div><b>${ESS_DEF[id].label}</b><div class="faint">${ESS_DEF[id].basis}</div></div></div>
-     <div class="field"><label for="opened">When did you buy or open it?</label><select id="opened" data-a="setOpened" data-v="${id}" style="padding:12px;border-radius:12px;border:1px solid var(--line2);background:#fff;min-height:46px">${opts.filter((o,i,a)=>a.findIndex(x=>x[0]===o[0])===i).map(o=>`<option value="${o[0]}" ${o[0]===e.opened?'selected':''}>${o[1]}${o[1]==='Current estimate'?` (${o[0]} days ago)`:''}</option>`).join('')}</select></div>
+    const ago=e.opened+S.day, opts=[...new Set([0,3,7,14,21,ago])].sort((a,b)=>a-b);
+    const sugg={dogfood:21,detergent:Math.round(16/S.hh.laundry*7),soap:14,dishtabs:Math.round(40/S.hh.dishRuns)*7}[id]||e.dur;
+    return sheetFrame('Adjust estimate',`<div class="row">${tile(id)}<div><b>${essLabel(id)}</b><div class="faint">${essBasis(id)}</div></div></div>
+     <div class="field"><label for="opened">When did you buy or open it?</label><select id="opened" data-a="setOpened" data-v="${id}" style="padding:12px;border-radius:12px;border:1px solid var(--line2);background:#fff;min-height:46px">${opts.map(o=>`<option value="${o}" ${o===ago?'selected':''}>${agoTxt(o)}</option>`).join('')}</select></div>
      <div class="field"><label for="dur">One usually lasts: <b class="num" id="durlbl">${Math.round(e.dur/7*10)/10} weeks</b></label><input type="range" id="dur" min="7" max="70" step="7" value="${e.dur}" data-a="setDur" data-v="${id}"><span class="faint">Suggested for your household: about ${Math.round(sugg/7)} weeks. <button class="link" data-a="useSugg" data-v="${id}:${sugg}">Use suggestion</button></span></div>
      <div class="card between"><div><div class="eyebrow">Estimated refill date</div><b>${r<=0?'Now':dateIn(r)}</b></div><span class="pill ${essState(id)[0]}">${essState(id)[1]}</span></div>
-     <div class="why">${I.info}<span>We’ll start with these estimates. You can adjust them anytime. Dayli can’t observe what you actually use.</span></div>
+     <div class="why">${I.info}<span>We’ll start with these estimates. You can adjust them anytime. Daily can’t observe what you actually use.</span></div>
      <button class="btn btn-dark btn-block" data-a="closeSheet">Save estimate</button>`,ui.back);
   },
   pantry(){
@@ -867,6 +883,8 @@ const SHEETS = {
     const t=(k,l,d)=>`<div class="setrow"><div><b>${l}</b><small>${d}</small></div><button class="toggle ${S.prefs[k]?'on':''}" data-a="pref" data-v="${k}" role="switch" aria-checked="${S.prefs[k]}" aria-label="${l}"></button></div>`;
     return sheetFrame('You & your data',`
      <div class="card" style="padding:4px 16px">${t('personal','Personalized suggestions','Use your household profile to tailor ideas')}${t('history','Use purchase history','Simulated history drives stock estimates')}${t('reminders','Replenishment reminders','In-app previews for essentials')}${t('offers','Relevant offers','Only for items you buy or plan to cook')}${t('quiet','Quiet hours','No reminders 21:00–08:00')}</div>
+     <div class="field"><label>Language</label><div class="seg">${[['en','English'],['fr','Français']].map(([k,v])=>`<button class="${(S.lang||'en')===k?'on':''}" data-a="setLang" data-v="${k}">${v}</button>`).join('')}</div></div>
+     <div class="field"><label for="set-name">First name</label><input id="set-name" value="${esc(S.name)}" maxlength="24" style="padding:12px;border-radius:12px;border:1.5px solid var(--line2);background:#fff;min-height:46px"></div>
      <div class="field"><label>International demo</label><div class="seg">${Object.keys(COUNTRIES).map(k=>`<button class="${S.country===k?'on':''}" data-a="country" data-v="${k}">${COUNTRIES[k].name}</button>`).join('')}</div><span class="faint">Adapts sample products, currency and fulfilment. The interface stays in English.</span></div>
      <div class="card stack" style="gap:8px"><b>Stored household data (simulated)</b>
       <div class="between faint"><span>Household</span><span>${S.hh.adults} adults, ${S.hh.kids} children${S.hh.dog?', 1 dog':''}</span></div>
@@ -878,9 +896,24 @@ const SHEETS = {
       <div class="btn-row"><button class="btn btn-sm btn-ghost" data-a="redoSetup">Redo household setup</button><button class="btn btn-sm btn-soft" data-a="resetProfile">${ui.confirmReset?'Tap again to confirm':'Reset profile data'}</button></div></div>
      <button class="btn btn-line btn-block" data-a="ask" data-v="I want to talk to a person">${I.person} Talk to a person</button>
      <button class="btn btn-ghost btn-block" data-a="sheet" data-v="presenter">${I.play} Demo scenarios & reset</button>
-     <div class="card stack" style="gap:8px"><b>About this prototype</b><p class="faint" style="margin:0">Auchan Dayli is an unofficial Auchan × EDHEC university concept. All products, prices, people and results are fictional demo data.</p>
+     <div class="card stack" style="gap:8px"><b>About this prototype</b><p class="faint" style="margin:0">Auchan Daily is an unofficial Auchan × EDHEC university concept. All products, prices, people and results are fictional demo data.</p>
       <div class="row" style="align-items:flex-start"><span class="tagf mvp">MVP</span><span class="faint">Estimates, meal plans, smart list, Drive/delivery suggestions, scripted assistant, human handover, in-app reminders.</span></div>
       <div class="row" style="align-items:flex-start"><span class="tagf fut">Future</span><span class="faint">Shelf NFC tags, product photo recognition and the Smart Basket Scan station need in-store hardware and are simulated here.</span></div></div>`);
+  },
+  manual(){
+    const m=ui.man, food=m.kind==='food', ems=food?['📦','🧀','🥖','🍷','🥩','🍓','🥛','🥫']:['📦','🧴','🧻','🪥','🐾','💊','🕯️','🧽'];
+    const eta=food?dateIn(m.exp):dateIn(Math.max(0,m.weeks*7-m.opened));
+    return sheetFrame(L('Add a product manually','Ajouter un produit à la main'),`<p class="muted" style="margin:0">${L('For anything bought elsewhere, like another store or a market. Auchan Daily will remind you, but can’t see the product itself.','Pour un produit acheté ailleurs (autre magasin, marché…). Auchan Daily vous le rappellera, sans pouvoir voir le produit lui-même.')}</p>
+     <div class="seg">${[['food',L('Food to use soon','Aliment à consommer')],['rec',L('Recurring item','Produit à racheter')]].map(([k,v])=>`<button class="${m.kind===k?'on':''}" data-a="manSet" data-v="kind" data-d="${k}">${v}</button>`).join('')}</div>
+     <div class="field"><label for="man-n">${L('Product name','Nom du produit')}</label><input id="man-n" value="${esc(m.n)}" placeholder="${food?L('e.g. Comté cheese','ex. Comté'):L('e.g. Toothpaste','ex. Dentifrice')}" maxlength="40" style="padding:12px;border-radius:12px;border:1.5px solid var(--line2);background:#fff;min-height:46px"></div>
+     <div class="field"><label for="man-s">${L('Where did you buy it?','Où l’avez-vous acheté ?')}</label><input id="man-s" value="${esc(m.store)}" maxlength="30" style="padding:12px;border-radius:12px;border:1.5px solid var(--line2);background:#fff;min-height:46px"></div>
+     ${food?`<div class="field"><label for="man-q">${L('Quantity (optional)','Quantité (facultatif)')}</label><input id="man-q" value="${esc(m.q)}" placeholder="${L('e.g. 250 g','ex. 250 g')}" maxlength="20" style="padding:12px;border-radius:12px;border:1.5px solid var(--line2);background:#fff;min-height:46px"></div>
+      <div class="card between"><b>${L('Use within','À consommer sous')}</b><div class="stepper"><button data-a="manSet" data-v="exp" data-d="-1" aria-label="−">−</button><span class="num" style="font-size:18px">${m.exp} ${L('d','j')}</span><button data-a="manSet" data-v="exp" data-d="1" aria-label="+">+</button></div></div>`
+     :`<div class="card between"><b>${L('Usually lasts','Dure en général')}</b><div class="stepper"><button data-a="manSet" data-v="weeks" data-d="-1" aria-label="−">−</button><span class="num" style="font-size:18px">${m.weeks} ${L('wk','sem.')}</span><button data-a="manSet" data-v="weeks" data-d="1" aria-label="+">+</button></div></div>
+      <div class="field"><label>${L('Bought or opened','Acheté ou ouvert')}</label><div class="seg">${[0,7,14].map(o=>`<button class="${+m.opened===o?'on':''}" data-a="manSet" data-v="opened" data-d="${o}">${agoTxt(o)}</button>`).join('')}</div></div>`}
+     <div class="field"><label>${L('Icon','Icône')}</label><div class="row" style="flex-wrap:wrap;gap:6px">${ems.map(x=>`<button class="chip ${m.e===x?'on':''}" style="font-size:20px;padding:6px 10px" data-a="manSet" data-v="e" data-d="${x}" aria-label="${x}">${x}</button>`).join('')}</div></div>
+     <div class="card between"><span class="muted">${food?L('Reminder before','Rappel avant le'):L('Estimated refill','Rachat estimé')}</span><b>${eta}</b></div>
+     <button class="btn btn-red btn-block" data-a="manSave" ${m.n.trim()?'':'disabled'}>${L('Add to My Home','Ajouter à Ma maison')}</button>`);
   },
   why(){ return sheetFrame('Why this suggestion?',`<p style="margin:0;font-size:15px">${esc(ui.arg)}</p><div class="why">${I.info}<span>Suggestions use simulated purchase history and the habits you confirmed. You can change or turn them off in You & your data.</span></div><button class="btn btn-ghost btn-block" data-a="sheet" data-v="settings">Personalization settings</button>`); },
   presenter(){ return sheetFrame('Demo scenarios',`<div class="presenter-sheet">${presenterHTML()}</div>`); },
@@ -892,40 +925,40 @@ const PROMPTS=[['🍽','Plan my meals for the week.'],['🥬','What can I cook w
 function aiMsg(t,b=[]){ return {r:'ai',t,b}; }
 function intent(q){
   const s=q.toLowerCase();
-  if(/person|human|advisor|agent|someone|customer service/.test(s)) return 'person';
-  if(/missing|order issue|refund|damaged|wrong item/.test(s)) return 'order';
-  if(/complete|pasta dinner|side/.test(s)) return 'expand';
-  if(/dog|kibble|pet/.test(s)) return 'dog';
-  if(/budget|spend|afford|cheap|money/.test(s)) return 'budget';
-  if(/cook|have at home|fridge|leftover|what can i make|cake/.test(s)) return 'cook';
-  if(/plan|meal|week|dinner/.test(s)) return 'plan';
-  if(/detergent|laundry|washing/.test(s)) return 'det';
-  if(/soap|essential|refill|run out|running low/.test(s)) return 'ess';
-  if(/store|aisle|in-store|in store/.test(s)) return 'store';
-  if(/drive|deliver|pickup|slot|when should i shop/.test(s)) return 'slot';
-  if(/^(hi|hello|hey|bonjour|hola)\b/.test(s)) return 'hello';
+  if(/person|human|advisor|agent|someone|customer service|personne|humain|conseill|service client/.test(s)) return 'person';
+  if(/missing|order issue|refund|damaged|wrong item|manque|rembours|abîm|commande/.test(s)) return 'order';
+  if(/complete|pasta dinner|side|compléter|accompagnement/.test(s)) return 'expand';
+  if(/dog|kibble|pet|chien|croquette/.test(s)) return 'dog';
+  if(/budget|spend|afford|cheap|money|dépense|argent|économ/.test(s)) return 'budget';
+  if(/cook|have at home|fridge|leftover|what can i make|cake|cuisiner|frigo|reste|gâteau|j'ai|j’ai/.test(s)) return 'cook';
+  if(/plan|meal|week|dinner|repas|semaine|dîner|menu/.test(s)) return 'plan';
+  if(/detergent|laundry|washing|lessive|linge/.test(s)) return 'det';
+  if(/soap|essential|refill|run out|running low|savon|essentiel|racheter|tablette|lave-vaisselle/.test(s)) return 'ess';
+  if(/store|aisle|in-store|in store|magasin|rayon/.test(s)) return 'store';
+  if(/drive|deliver|pickup|slot|when should i shop|livraison|retrait|créneau/.test(s)) return 'slot';
+  if(/^(hi|hello|hey|bonjour|salut|hola)\b/.test(s)) return 'hello';
   return 'other';
 }
 function reply(k){
-  const d=remaining('dogfood');
+  const d=remaining('dogfood'), n=S.hh.adults+S.hh.kids;
   switch(k){
-    case 'plan': { const {miss}=planMissing(planMeals()); return [aiMsg(`Here’s a five-dinner plan for ${S.hh.adults+S.hh.kids}, each ready in ${S.hh.prep} minutes or less. I’ve used the rice, onions, garlic and spinach you already have.`,[{k:'plan'}]),
-      aiMsg(`Adding the ${miss.length} missing ingredients comes to ${money(sum(miss))}, which keeps your food list within your ${money(budget())} budget. Swap any dinner before adding.`)]; }
-    case 'cook': return [aiMsg('With what’s at home, here are two ideas. The spinach is the one to use first.',[{k:'recipes',ids:['spinachpenne','omelette']}]),
-      aiMsg(`With the milk, sugar and flour already at home, you’re one ingredient away from a simple cake. Add eggs for ${money(pr('eggs'))} and you’ll have the ingredients for a simple cake.`,[{k:'prod1',id:'eggs',src:'Cake idea',label:'Add eggs · '+money(pr('eggs'))}])];
-    case 'budget': return [aiMsg(`Your food list is at ${money(foodTotal())} of your ${money(budget())} weekly budget. Household and pet essentials are tracked separately (${money(essTotal())}).`,[{k:'budget'}]),
-      aiMsg('I’ll always show the price before you add anything, and I won’t add paid items without your OK. Want me to plan dinners that fit what’s left?',[{k:'acts',list:[['Plan dinners within budget','sheet','plan'],['See this week’s loyalty prices','shopOffers','']]}])];
-    case 'dog': return [aiMsg(`You opened the last 3 kg bag ${S.ess.dogfood.opened+S.day} days ago, and you told me one usually lasts about 3 weeks. So it may run out ${d<=0?'about now':'around '+dateIn(d)}.`),
-      aiMsg(`Adding it to Thursday’s ${C().drive.toLowerCase()} would get it home before then.`,[{k:'prod1',id:'dogfood',src:'Replenish',label:'Add usual bag · '+money(pr('dogfood'))},{k:'acts',list:[['Adjust the estimate','openEss','dogfood']]}])];
-    case 'expand': return [aiMsg('Make it a complete dinner with grated cheese and a side salad. Pick what you’d like.',[{k:'prods',ids:['cheese','salad'],src:'Dinner idea'}])];
-    case 'det': return [aiMsg(`At ${S.hh.laundry} loads a week, your detergent may need a refill ${remaining('detergent')<=7?'this week':'next week'}. The XL bottle costs more today but lasts about twice as long.`,[{k:'acts',list:[['Compare formats','sheet','detergent']]}])];
-    case 'ess': return [aiMsg(`${reviewCount()} essential${reviewCount()===1?'':'s'} may need a look soon. These are estimates from your usual purchases, not live stock.`,[{k:'acts',list:[['Open My Home','tab','home']]}])];
-    case 'store': return [aiMsg('Your list is sorted by aisle for in-store mode, with a running total and your budget in view.',[{k:'acts',list:[['Start in-store mode','store','']]}])];
-    case 'slot': return [aiMsg(`I’d suggest Thursday 18:00–18:30 ${C().drive.toLowerCase()}: you usually shop Thursdays, the slot shows good availability (simulated), and it arrives before your dog food runs low.`,[{k:'acts',list:[['See slots','sheet','checkout']]}])];
-    case 'order': return [aiMsg('I’m sorry about that. Here’s your latest order. Which item is missing?',[{k:'order'}])];
-    case 'person': return [aiMsg('Of course. I’ll pass a short summary to a customer service advisor so you don’t have to repeat yourself. Please check it first.',[{k:'handover'}])];
-    case 'hello': return [aiMsg('Hello Léa! I can plan meals, keep an eye on essentials, and help with orders. What would you like to do?',[{k:'suggest'}])];
-    default: return [aiMsg('I can’t help with that in this demo. I’m a scripted prototype, so I only cover a few journeys. Here’s what I can do:',[{k:'suggest'}])];
+    case 'plan': { const {miss}=planMissing(planMeals()); return [aiMsg(L(`Here’s a five-dinner plan for ${n}, each ready in ${S.hh.prep} minutes or less. I’ve used the rice, onions, garlic and spinach you already have.`,`Voici un plan de cinq dîners pour ${n} personnes, chacun prêt en ${S.hh.prep} minutes maximum. J’ai utilisé le riz, les oignons, l’ail et les épinards que vous avez déjà.`),[{k:'plan'}]),
+      aiMsg(L(`Adding the ${miss.length} missing ingredients comes to ${money(sum(miss))}, which keeps your food list within your ${money(budget())} budget. Swap any dinner before adding.`,`Les ${miss.length} ingrédients manquants coûtent ${money(sum(miss))}, ce qui garde votre liste dans votre budget de ${money(budget())}. Vous pouvez changer un dîner avant d’ajouter.`))]; }
+    case 'cook': return [aiMsg(L('With what’s at home, here are two ideas. The spinach is the one to use first.','Avec ce que vous avez, voici deux idées. Les épinards sont à utiliser en priorité.'),[{k:'recipes',ids:['spinachpenne','omelette']}]),
+      aiMsg(L(`With the milk, sugar and flour already at home, you’re one ingredient away from a simple cake. Add eggs for ${money(pr('eggs'))} and you’ll have the ingredients for a simple cake.`,`Avec le lait, le sucre et la farine que vous avez déjà, il ne manque qu’un ingrédient pour un gâteau simple. Ajoutez des œufs pour ${money(pr('eggs'))} et vous aurez tout le nécessaire.`),[{k:'prod1',id:'eggs',src:'Cake idea',label:L('Add eggs · ','Ajouter des œufs · ')+money(pr('eggs'))}])];
+    case 'budget': return [aiMsg(L(`Your food list is at ${money(foodTotal())} of your ${money(budget())} weekly budget. Household and pet essentials are tracked separately (${money(essTotal())}).`,`Votre liste alimentaire est à ${money(foodTotal())} sur un budget hebdomadaire de ${money(budget())}. L’entretien et les animaux sont suivis à part (${money(essTotal())}).`),[{k:'budget'}]),
+      aiMsg(L('I’ll always show the price before you add anything, and I won’t add paid items without your OK. Want me to plan dinners that fit what’s left?','Je vous montre toujours le prix avant tout ajout, et je n’ajoute rien de payant sans votre accord. Voulez-vous que je prévoie des dîners avec ce qu’il reste ?'),[{k:'acts',list:[['Plan dinners within budget','sheet','plan'],['See this week’s loyalty prices','shopOffers','']]}])];
+    case 'dog': { const ago=S.ess.dogfood.opened+S.day; return [aiMsg(L(`You opened the last 3 kg bag ${ago} days ago, and you told me one usually lasts about 3 weeks. So it may run out ${d<=0?'about now':'around '+dateIn(d)}.`,`Vous avez ouvert le dernier sac de 3 kg il y a ${ago} jours, et vous m’avez indiqué qu’un sac dure environ 3 semaines. Il pourrait donc manquer ${d<=0?'dès maintenant':'vers le '+dateIn(d).replace(/\.$/,'')}.`)),
+      aiMsg(L(`Adding it to Thursday’s ${C().drive.toLowerCase()} would get it home before then.`,`En l’ajoutant à votre commande Drive de jeudi, il arrivera à temps.`),[{k:'prod1',id:'dogfood',src:'Replenish',label:L('Add usual bag · ','Ajouter le sac habituel · ')+money(pr('dogfood'))},{k:'acts',list:[['Adjust the estimate','openEss','dogfood']]}])]; }
+    case 'expand': return [aiMsg(L('Make it a complete dinner with grated cheese and a side salad. Pick what you’d like.','Faites-en un dîner complet avec du fromage râpé et une salade. Choisissez ce qui vous tente.'),[{k:'prods',ids:['cheese','salad'],src:'Dinner idea'}])];
+    case 'det': return [aiMsg(L(`At ${S.hh.laundry} loads a week, your detergent may need a refill ${remaining('detergent')<=7?'this week':'next week'}. The XL bottle costs more today but lasts about twice as long.`,`À ${S.hh.laundry} lessives par semaine, il faudra peut-être racheter de la lessive ${remaining('detergent')<=7?'cette semaine':'la semaine prochaine'}. Le bidon XL coûte plus cher aujourd’hui mais dure environ deux fois plus longtemps.`),[{k:'acts',list:[['Compare formats','sheet','detergent']]}])];
+    case 'ess': { const c=reviewCount(); return [aiMsg(L(`${c} essential${c===1?'':'s'} may need a look soon. These are estimates from your usual purchases, not live stock.`,`${c} produit${c===1?'':'s'} du quotidien ${c===1?'mérite':'méritent'} bientôt un coup d’œil. Ce sont des estimations tirées de vos achats habituels, pas un stock réel.`),[{k:'acts',list:[['Open My Home','tab','home']]}])]; }
+    case 'store': return [aiMsg(L('Your list is sorted by aisle for in-store mode, with a running total and your budget in view.','Votre liste est triée par rayon pour le mode magasin, avec le total en cours et votre budget sous les yeux.'),[{k:'acts',list:[['Start in-store mode','store','']]}])];
+    case 'slot': return [aiMsg(L(`I’d suggest Thursday 18:00–18:30 ${C().drive.toLowerCase()}: you usually shop Thursdays, the slot shows good availability (simulated), and it arrives before your dog food runs low.`,`Je vous propose jeudi 18h00–18h30 en Drive : vous faites souvent vos courses le jeudi, le créneau est disponible (simulé) et tout arrive avant que les croquettes ne manquent.`),[{k:'acts',list:[['See slots','sheet','checkout']]}])];
+    case 'order': return [aiMsg(L('I’m sorry about that. Here’s your latest order. Which item is missing?','Désolé pour ce désagrément. Voici votre dernière commande. Quel article manque ?'),[{k:'order'}])];
+    case 'person': return [aiMsg(L('Of course. I’ll pass a short summary to a customer service advisor so you don’t have to repeat yourself. Please check it first.','Bien sûr. Je transmets un court résumé à un conseiller du service client pour que vous n’ayez pas à tout répéter. Vérifiez-le d’abord.'),[{k:'handover'}])];
+    case 'hello': return [aiMsg(L(`Hello ${S.name}! I can plan meals, keep an eye on essentials, and help with orders. What would you like to do?`,`Bonjour ${S.name} ! Je peux prévoir vos repas, surveiller l’essentiel et vous aider avec vos commandes. Que souhaitez-vous faire ?`),[{k:'suggest'}])];
+    default: return [aiMsg(L('I can’t help with that in this demo. I’m a scripted prototype, so I only cover a few journeys. Here’s what I can do:','Je ne peux pas vous aider sur ce point dans cette démo. Je suis un prototype scénarisé qui couvre quelques parcours seulement. Voici ce que je sais faire :'),[{k:'suggest'}])];
   }
 }
 function send(text){
@@ -964,7 +997,7 @@ function block(b,mi,bi){
     case 'resolve': return b.done?`<span class="pill ok">✓ ${esc(b.done)}</span>`:`<div class="btn-row"><button class="btn btn-sm btn-red" data-a="refund" data-v="${ref}">Refund ${money(pr(b.p))} to loyalty balance</button><button class="btn btn-sm btn-line" data-a="ask" data-v="I want to talk to a person">${I.person} Talk to a person</button></div>`;
     case 'handover': { const o=S.orders[0], miss=o.issue;
       return `<div class="rich"><div class="eyebrow">Summary for the advisor</div>
-       <div class="stack" style="gap:6px;font-size:13.5px"><div class="between"><span class="muted">Customer</span><b>Léa M. (demo profile)</b></div><div class="between"><span class="muted">Topic</span><b>${esc(S.topic||'General request')}</b></div>${miss?`<div class="between"><span class="muted">Order</span><b>${o.id} · ${nm(miss)} missing</b></div>`:''}<div class="between"><span class="muted">Market</span><b>${C().name} · ${C().lang}</b></div><div class="between"><span class="muted">Shared</span><b>Last ${Math.min(6,S.chat.length)} messages</b></div></div>
+       <div class="stack" style="gap:6px;font-size:13.5px"><div class="between"><span class="muted">Customer</span><b>${esc(S.name)} (demo profile)</b></div><div class="between"><span class="muted">Topic</span><b>${esc(S.topic||'General request')}</b></div>${miss?`<div class="between"><span class="muted">Order</span><b>${o.id} · ${nm(miss)} missing</b></div>`:''}<div class="between"><span class="muted">Market</span><b>${C().name} · ${C().lang}</b></div><div class="between"><span class="muted">Shared</span><b>Last ${Math.min(6,S.chat.length)} messages</b></div></div>
        ${b.done==='yes'?`<span class="pill ok">✓ Shared with your consent</span>`:b.done==='no'?`<span class="pill neutral">Not shared</span>`:`<div class="btn-row"><button class="btn btn-sm btn-red" data-a="handover" data-v="${ref}">Share & connect</button><button class="btn btn-sm btn-ghost" data-a="blkNo" data-v="${ref}">Cancel</button></div>`}</div>`; }
     case 'translate': { const c=C().cs;
       return `<div class="rich"><div class="between"><b>Multilingual support</b><span class="pill info">Translation example · demo</span></div>
@@ -976,7 +1009,7 @@ function block(b,mi,bi){
 function renderAsk(){
   if(!S.chat.length) return `<div class="stack-lg" style="padding-top:6px">
    <div class="stack" style="align-items:flex-start"><span style="width:64px;height:64px;border-radius:22px;background:var(--red);display:grid;place-items:center;box-shadow:0 10px 24px rgba(225,0,26,.28)">${bird(48)}</span>
-   <h1 class="h-xl">Hi Léa, what can I help with?</h1><p class="muted" style="margin:0">I plan meals, watch your essentials and sort out orders. You stay in control of every addition.</p><span class="demo-tag">Scripted demo assistant</span></div>
+   <h1 class="h-xl">${L(`Hi ${esc(S.name)}, what can I help with?`,`Bonjour ${esc(S.name)}, comment puis-je vous aider ?`)}</h1><p class="muted" style="margin:0">I plan meals, watch your essentials and sort out orders. You stay in control of every addition.</p><span class="demo-tag">Scripted demo assistant</span></div>
    <div class="suggest">${PROMPTS.map(p=>`<button data-a="ask" data-v="${p[1]}"><span class="s-ico">${p[0]}</span>${p[1]}</button>`).join('')}</div>
    <button class="btn btn-line" data-a="ask" data-v="I want to talk to a person">${I.person} Talk to a person</button></div>`;
   return `<div class="chat" aria-live="polite">${S.chat.map((m,mi)=>{
@@ -1040,39 +1073,46 @@ SHEETS.storeDone=function(){
   const it=S.list.filter(l=>l.ck);
   return sheetFrame('Basket summary',`<div style="text-align:center" class="stack"><span class="pill check" style="align-self:center">DEMO · not a real payment</span><b class="num" style="font-family:var(--f-display);font-size:36px">${money(basketTotal())}</b><span class="faint">${it.length} items · Pay at any checkout (simulated)</span></div>
    <div class="card" style="padding:6px 14px">${it.map(l=>`<div class="line-item">${tile(l.p)}<div class="li-main"><div class="li-name">${nm(l.p)}${l.src?`<span class="src">${esc(l.src)}</span>`:''}</div><div class="li-sub">× ${l.q}</div></div><span class="price">${money(pr(l.p)*l.q)}</span></div>`).join('')}</div>
-   <button class="btn btn-dark btn-block" data-a="storeExit">Back to Dayli</button>`);
+   <button class="btn btn-dark btn-block" data-a="storeExit">Back to Daily</button>`);
 };
 
 /* ================= ONBOARDING ================= */
 function onbHTML(){
-  const st=ui.onb||0, h=S.hh, steps=6;
-  const nav=(next,label='Continue')=>`<div class="stack" style="gap:8px"><button class="btn btn-red btn-block" data-a="onbGo" data-v="${next}">${label}</button>${st>0?`<button class="btn btn-ghost btn-block" data-a="onbGo" data-v="${st-1}">Back</button>`:''}</div>`;
-  const stepper=(k,label)=>`<div class="card between"><b>${label}</b><div class="stepper"><button data-a="hh" data-v="${k}" data-d="-1" aria-label="Fewer ${label}">−</button><span class="num">${h[k]}</span><button data-a="hh" data-v="${k}" data-d="1" aria-label="More ${label}">+</button></div></div>`;
+  const st=ui.onb||0, h=S.hh, steps=8;
+  const nav=(next,label)=>`<div class="stack" style="gap:8px"><button class="btn btn-red btn-block" data-a="onbGo" data-v="${next}" ${st===1&&!S.name.trim()?'disabled':''}>${label||L('Continue','Continuer')}</button>${st>0?`<button class="btn btn-ghost btn-block" data-a="onbGo" data-v="${st-1}">${L('Back','Retour')}</button>`:''}</div>`;
+  const stepper=(k,label)=>`<div class="card between"><b>${label}</b><div class="stepper"><button data-a="hh" data-v="${k}" data-d="-1" aria-label="−">−</button><span class="num">${h[k]}</span><button data-a="hh" data-v="${k}" data-d="1" aria-label="+">+</button></div></div>`;
   const opt=(k,val,icon,t,d)=>`<button class="opt ${h[k]===val?'on':''}" data-a="hhSet" data-v="${k}" data-d="${val}" aria-pressed="${h[k]===val}"><span class="oi">${icon}</span><b>${t}</b><small>${d}</small></button>`;
   let body='';
-  if(st===0) body=`<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:18px"><span style="width:92px;height:92px;border-radius:30px;background:var(--red);display:grid;place-items:center;box-shadow:0 18px 40px rgba(225,0,26,.3)">${bird(70)}</span>
-    <div><div class="eyebrow">Auchan Dayli</div><h1 class="h-xl" style="font-size:36px">Plan ahead, shop with confidence, manage everyday essentials.</h1></div>
-    <p class="muted" style="margin:0">A few questions about your household help Dayli start with sensible estimates. It takes under a minute.</p><span class="demo-tag" style="align-self:flex-start">Unofficial Auchan × EDHEC university concept · Demo data</span></div>`+nav(1,'Set up my household');
-  if(st===1) body=`<div class="onb-body"><h2 class="h-lg">Who’s in your household?</h2>${stepper('adults','Adults')}${stepper('kids','Children')}</div>`+nav(2);
-  if(st===2) body=`<div class="onb-body"><h2 class="h-lg">Any pets?</h2><div class="opt-grid">${opt('dog',true,'🐕','A dog','Track food & treats')}${opt('dog',false,'🚫','No dog','Skip pet food')}${opt('cat',true,'🐈','A cat','Track cat food')}${opt('cat',false,'—','No cat','')}</div></div>`+nav(3);
-  if(st===3) body=`<div class="onb-body"><h2 class="h-lg">How do you usually cook?</h2><div class="opt-grid">${opt('cooking','most','🍳','Most evenings','5+ dinners a week')}${opt('cooking','some','🥗','A few evenings','2–4 dinners')}${opt('cooking','rare','🥡','Rarely','Quick meals mostly')}</div>
-    <div class="field"><label>Time per dinner</label><div class="seg">${[20,30,45].map(m=>`<button class="${h.prep===m?'on':''}" data-a="hhSet" data-v="prep" data-d="${m}">≤ ${m} min</button>`).join('')}</div></div></div>`+nav(4);
-  if(st===4) body=`<div class="onb-body"><h2 class="h-lg">Recurring household activities</h2><p class="muted" style="margin:0">Used only to estimate when essentials might run low.</p>${stepper('laundry','Laundry loads per week')}
-    <div class="card between"><b>Hand washing & bathroom</b><span class="faint">Typical for ${h.adults+h.kids} people</span></div></div>`+nav(5);
-  if(st===5){ const rows=[['detergent',Math.round(16/h.laundry*7)],['dogfood',21],['soap',14]].filter(r=>r[0]!=='dogfood'||h.dog);
-    body=`<div class="onb-body"><h2 class="h-lg">Your starting estimates</h2><div class="why">${I.info}<span>We’ll start with these estimates. You can adjust them anytime. They’re demo assumptions, not facts about your home.</span></div>
-    ${rows.map(([id,sug])=>{ const e=S.ess[id]; return `<div class="card stack" style="gap:10px"><div class="row">${tile(id,42)}<div style="flex:1"><b>${ESS_DEF[id].label}</b><div class="faint">Suggested: about ${Math.round(sug/7)} week${sug>7?'s':''}</div></div></div>
-      <div class="field"><label for="ob-${id}">Bought or opened</label><select id="ob-${id}" data-a="setOpened" data-v="${id}" style="padding:10px;border-radius:12px;border:1px solid var(--line2);background:#fff;min-height:44px">${[[0,'Today'],[5,'5 days ago'],[14,'2 weeks ago'],[18,'18 days ago'],[20,'20 days ago']].map(o=>`<option value="${o[0]}" ${e.opened===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
-      <div class="between"><span class="faint">Lasts about</span><div class="stepper"><button data-a="durStep" data-v="${id}" data-d="-7" aria-label="Shorter">−</button><span class="num" style="font-size:17px">${e.dur/7} wk</span><button data-a="durStep" data-v="${id}" data-d="7" aria-label="Longer">+</button></div></div>
-      <div class="between"><span class="faint">Estimated refill</span><b>${remaining(id)<=0?'Now':dateIn(remaining(id))}</b></div></div>`;}).join('')}</div>`+nav(6,'Start using Dayli');
+  if(st===0) body=`<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px"><span style="width:92px;height:92px;border-radius:30px;background:var(--red);display:grid;place-items:center;box-shadow:0 18px 40px rgba(225,0,26,.3)">${bird(70)}</span>
+    <div><div class="eyebrow">Auchan Daily</div><h1 class="h-xl" style="font-size:32px">Choose your language<br><span style="color:var(--ink3)">Choisissez votre langue</span></h1></div>
+    <div class="opt-grid">${[['en','🇬🇧','English','Interface in English'],['fr','🇫🇷','Français','Interface en français']].map(([k,f,t,d])=>`<button class="opt ${S.lang===k?'on':''}" data-a="setLang" data-v="${k}" aria-pressed="${S.lang===k}"><span class="oi">${f}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div>
+    <span class="demo-tag" style="align-self:flex-start">Unofficial Auchan × EDHEC university concept · Demo data</span></div>`+`<div class="stack"><button class="btn btn-red btn-block" data-a="onbGo" data-v="1" ${S.lang?'':'disabled'}>${S.lang==='fr'?'Continuer':'Continue'}</button></div>`;
+  if(st===1) body=`<div class="onb-body" style="justify-content:center"><span style="width:72px;height:72px;border-radius:24px;background:var(--red);display:grid;place-items:center">${bird(54)}</span>
+    <h1 class="h-xl">${L('Plan ahead, shop with confidence, manage everyday essentials.','Anticipez, faites vos courses sereinement, gérez l’essentiel du quotidien.')}</h1>
+    <div class="field"><label for="onb-name">${L('What’s your first name?','Quel est votre prénom ?')}</label><input id="onb-name" value="${esc(S.name)}" autocomplete="given-name" maxlength="24" style="padding:14px;border-radius:14px;border:1.5px solid var(--line2);background:#fff;font-size:17px;min-height:50px"></div>
+    <p class="muted" style="margin:0">${L('A few questions about your household help Auchan Daily start with sensible estimates. It takes under a minute.','Quelques questions sur votre foyer permettent à Auchan Daily de démarrer avec des estimations cohérentes. Moins d’une minute.')}</p></div>`+nav(2,L('Set up my household','Configurer mon foyer'));
+  if(st===2) body=`<div class="onb-body"><h2 class="h-lg">${L('Who’s in your household?','Qui vit dans votre foyer ?')}</h2>${stepper('adults',L('Adults','Adultes'))}${stepper('kids',L('Children','Enfants'))}</div>`+nav(3);
+  if(st===3) body=`<div class="onb-body"><h2 class="h-lg">${L('Any pets?','Des animaux ?')}</h2><div class="opt-grid">${opt('dog',true,'🐕',L('A dog','Un chien'),L('Track food & treats','Suivre les croquettes'))}${opt('dog',false,'🚫',L('No dog','Pas de chien'),'')}${opt('cat',true,'🐈',L('A cat','Un chat'),L('Track cat food','Suivre sa nourriture'))}${opt('cat',false,'—',L('No cat','Pas de chat'),'')}</div></div>`+nav(4);
+  if(st===4) body=`<div class="onb-body"><h2 class="h-lg">${L('How do you usually cook?','Comment cuisinez-vous ?')}</h2><div class="opt-grid">${opt('cooking','most','🍳',L('Most evenings','Presque tous les soirs'),L('5+ dinners a week','5 dîners ou plus'))}${opt('cooking','some','🥗',L('A few evenings','Quelques soirs'),L('2–4 dinners','2 à 4 dîners'))}${opt('cooking','rare','🥡',L('Rarely','Rarement'),L('Quick meals mostly','Surtout du rapide'))}</div>
+    <div class="field"><label>${L('Time per dinner','Temps par dîner')}</label><div class="seg">${[20,30,45].map(m=>`<button class="${h.prep===m?'on':''}" data-a="hhSet" data-v="prep" data-d="${m}">≤ ${m} min</button>`).join('')}</div></div></div>`+nav(5);
+  if(st===5) body=`<div class="onb-body"><h2 class="h-lg">${L('Recurring household activities','Tâches ménagères récurrentes')}</h2><p class="muted" style="margin:0">${L('Used only to estimate when essentials might run low.','Sert uniquement à estimer quand l’essentiel risque de manquer.')}</p>${stepper('laundry',L('Laundry loads per week','Lessives par semaine'))}
+    <div class="field"><label>${L('Do you have a dishwasher?','Avez-vous un lave-vaisselle ?')}</label><div class="opt-grid">${opt('dishwasher',true,'🍽️',L('Yes','Oui'),L('Track dishwasher tablets','Suivre les tablettes'))}${opt('dishwasher',false,'🧽',L('No','Non'),L('Washing up by hand','Vaisselle à la main'))}</div></div>
+    ${h.dishwasher?stepper('dishRuns',L('Dishwasher cycles per week','Cycles de lave-vaisselle par semaine')):''}</div>`+nav(6);
+  if(st===6){ const rows=[['detergent',Math.round(16/h.laundry*7)],['dogfood',21],['soap',14],['dishtabs',Math.round(40/h.dishRuns)*7]].filter(r=>essOn(r[0]));
+    body=`<div class="onb-body"><h2 class="h-lg">${L('Your starting estimates','Vos estimations de départ')}</h2><div class="why">${I.info}<span>${L('We’ll start with these estimates. You can adjust them anytime. They’re demo assumptions, not facts about your home.','Nous commençons avec ces estimations. Vous pouvez les ajuster à tout moment. Ce sont des hypothèses de démo, pas des faits sur votre foyer.')}</span></div>
+    ${rows.map(([id,sug])=>{ const e=S.ess[id]; const w=Math.round(sug/7); return `<div class="card stack" style="gap:10px"><div class="row">${tile(id,42)}<div style="flex:1"><b>${essLabel(id)}</b><div class="faint">${L(`Suggested: about ${w} week${w>1?'s':''}`,`Suggéré : environ ${w} semaine${w>1?'s':''}`)}</div></div></div>
+      <div class="field"><label for="ob-${id}">${L('Bought or opened','Acheté ou ouvert')}</label><select id="ob-${id}" data-a="setOpened" data-v="${id}" style="padding:10px;border-radius:12px;border:1px solid var(--line2);background:#fff;min-height:44px">${[...new Set([0,5,14,18,20,44,e.opened])].sort((a,b)=>a-b).map(o=>`<option value="${o}" ${e.opened===o?'selected':''}>${agoTxt(o)}</option>`).join('')}</select></div>
+      <div class="between"><span class="faint">${L('Lasts about','Dure environ')}</span><div class="stepper"><button data-a="durStep" data-v="${id}" data-d="-7" aria-label="−">−</button><span class="num" style="font-size:17px">${e.dur/7} ${L('wk','sem.')}</span><button data-a="durStep" data-v="${id}" data-d="7" aria-label="+">+</button></div></div>
+      <div class="between"><span class="faint">${L('Estimated refill','Rachat estimé')}</span><b>${remaining(id)<=0?L('Now','Maintenant'):dateIn(remaining(id))}</b></div></div>`;}).join('')}</div>`+nav(7,L('Start using Auchan Daily','Commencer avec Auchan Daily'));
   }
-  return `<div class="onb" role="dialog" aria-label="Household setup"><div class="onb-steps">${Array.from({length:steps},(_,i)=>`<i class="${i<=st?'on':''}"></i>`).join('')}</div><div style="height:14px"></div>${body}</div>`;
+  return `<div class="onb" role="dialog" aria-label="Setup"><div class="onb-steps">${Array.from({length:steps-1},(_,i)=>`<i class="${i<=st?'on':''}"></i>`).join('')}</div><div style="height:14px"></div>${body}</div>`;
 }
+function agoTxt(o){ if(o===0) return L('Today','Aujourd’hui'); if(o%7===0) return L(`${o/7} week${o>7?'s':''} ago`,`Il y a ${o/7} semaine${o>7?'s':''}`); return L(`${o} days ago`,`Il y a ${o} jours`); }
 
 /* ================= PRESENTER ================= */
 const SCEN=[
   {id:'plan',t:'Plan my week',tab:'today',steps:[
-    ['Open “Plan five dinners” on Today','sheet:plan','sheet:plan'],['Swap a meal, then add the missing ingredients','addPlan','addPlan'],['Accept the cake idea: add eggs · €2.40','addEggs','add:eggs'],['Open My List: aisles, budget, totals','tab:list','tab:list'],['Choose Drive and place the demo order','sheet:checkout','order']]},
+    ['Open “Plan five dinners” on Today','sheet:plan','sheet:plan'],['Swap a meal, then add the missing ingredients','addPlan','addPlan'],['Accept the cake idea: add eggs','addEggs','add:eggs'],['Open My List: aisles, budget, totals','tab:list','tab:list'],['Choose Drive and place the demo order','sheet:checkout','order']]},
   {id:'refill',t:'Refill household essentials',tab:'home',steps:[
     ['Review estimates in My Home','tab:home','tab:home'],['Fast-forward 2 weeks','ff','ff'],['Compare detergent formats and pick one','sheet:detergent','add:detergent'],['Prepare a Drive order: accept the dog food prompt','sheet:checkout','add:dogfood'],['Place the demo order','sheet:checkout','order']]},
   {id:'store',t:'Shop in store',tab:'list',steps:[
@@ -1084,13 +1124,195 @@ function presenterHTML(){
   const sc=SCEN.find(s=>s.id===S.scenario);
   const lo=S.list.length?null:S.lastOrder;
   const start=S.startValue??0, acc=lo?lo.sugg:suggestedValue(), fin=lo?lo.total:listTotal(), other=fin-start-acc;
-  return `<div class="pr-brand"><span class="pb">${bird(28)}</span><div><b>Auchan Dayli</b><small>Presenter panel · unofficial university concept</small></div></div>
+  return `<div class="pr-brand"><span class="pb">${bird(28)}</span><div><b>Auchan Daily</b><small>Presenter panel · unofficial university concept</small></div></div>
   <div class="stack" style="gap:8px"><h3>Demo scenarios</h3><div class="scen">${SCEN.map((s,i)=>`<button class="sc ${S.scenario===s.id?'on':''}" data-a="scenario" data-v="${s.id}"><span class="n">${i+1}</span>${s.t}</button>`).join('')}</div></div>
   ${sc?`<div class="guide"><b>${sc.t}</b><ol>${sc.steps.map((st,i)=>`<li class="${i<S.step?'done':i===S.step?'now':''}">${st[0]}${i===S.step&&st[1]?` <button class="link" data-a="go" data-v="${esc(st[1])}">Show me</button>`:''}</li>`).join('')}</ol>${S.step>=sc.steps.length?'<span class="pill ok">Scenario complete</span>':''}</div>`:`<p class="pr-note">Pick a scenario to reset to a consistent starting state and get a step-by-step guide.</p>`}
   <div class="stack" style="gap:8px"><h3>Basket value</h3><div class="metric"><span>Starting basket</span><b>${money(start)}</b><span>Accepted recommendations</span><b>+${money(acc)}</b>${Math.abs(other)>.004?`<span>Other changes</span><b>${other>=0?'+':'−'}${money(Math.abs(other))}</b>`:''}<span class="tot">Final simulated basket</span><b class="tot">${money(fin)}</b></div><p class="pr-note">Demonstration calculations from a fixed fictional catalog, not measured business results.${lo?' Showing the last demo order.':''}</p></div>
   <div class="pr-ctrl"><button class="btn btn-line" data-a="ff">Fast-forward 2 weeks</button><button class="btn btn-soft" data-a="reset">Reset demo</button><button class="btn btn-line" data-a="redoSetup">Show onboarding</button><button class="btn btn-line" data-a="sampleNotif">Preview reminder</button></div>
+  <div class="field"><label style="font-size:12.5px">Language</label><div class="seg">${[['en','English'],['fr','Français']].map(([k,v])=>`<button class="${(S.lang||'en')===k?'on':''}" data-a="setLang" data-v="${k}">${v}</button>`).join('')}</div></div>
   <div class="field"><label style="font-size:12.5px">Market (demo)</label><div class="seg">${Object.keys(COUNTRIES).map(k=>`<button class="${S.country===k?'on':''}" data-a="country" data-v="${k}">${COUNTRIES[k].name}</button>`).join('')}</div></div>
   <div class="stack" style="gap:6px"><h3>What’s real vs future</h3><div class="row pr-note" style="align-items:flex-start"><span class="tagf mvp">MVP</span><span>Estimates, meal plans, smart list, Drive/delivery suggestion, scripted assistant, handover, in-app reminders, photo recognition (near-term).</span></div><div class="row pr-note" style="align-items:flex-start"><span class="tagf fut">Future</span><span>Shelf NFC tags and the Smart Basket Scan station need store hardware.</span></div></div>`;
+}
+</script>
+<script>
+/* ================= FRENCH TRANSLATION LAYER ================= */
+const FR_NAMES={bananas:'Bananes',apples:'Pommes Gala',lemon:'Citrons',zucchini:'Courgettes',peppers:'Poivrons mélangés',salad:'Salade mélangée',spinach:'Pousses d’épinard',onion:'Oignons jaunes',garlic:'Ail',tomatoes:'Tomates grappe',buns:'Pains burger briochés',tortillas:'Tortillas de blé',eggs:'Œufs plein air',milk:'Lait demi-écrémé',yogurt:'Yaourts nature',cheese:'Emmental râpé',cream:'Crème fraîche liquide',butter:'Beurre doux',chicken:'Hauts de cuisse de poulet',salmon:'Pavés de saumon',patties:'Steaks hachés',pasta:'Penne rigate',pastaB:'Penne complètes',tomsauce:'Sauce tomate basilic',rice:'Riz basmati',lentils:'Lentilles corail',coconut:'Lait de coco',beans:'Haricots noirs',flour:'Farine de blé',sugar:'Sucre en poudre',ketchup:'Ketchup',coffee:'Café moulu',coffeeB:'Café moulu marque Auchan',juice:'Jus d’orange',detergent:'Lessive liquide',detergentXL:'Lessive liquide XL',soap:'Savon liquide mains',soapRefill:'Recharge savon',dishtabs:'Tablettes lave-vaisselle',dogfood:'Croquettes chien adulte',dogtreats:'Friandises dentaires chien'};
+const FR={
+/* nav & shell */
+'Today':'Aujourd’hui','Shop':'Courses','Ask Auchan':'Demander à Auchan','My Home':'Ma maison','My List':'Ma liste','Main':'Navigation principale','Setup':'Configuration',
+'Profile, privacy and settings':'Profil, confidentialité et réglages','How can I help?':'Comment puis-je vous aider ?','Collapse':'Réduire',
+'Suggestions for your day':'Suggestions pour votre journée','Suggestions for shopping':'Suggestions pour vos courses','Suggestions for this chat':'Suggestions pour cette conversation','Suggestions for your home':'Suggestions pour votre maison','Suggestions for your list':'Suggestions pour votre liste',
+'Suggest the best day and pickup option':'Proposer le meilleur jour et mode de retrait','Shop this list in store':'Faire cette liste en magasin','A cake is one ingredient away':'Un gâteau à un ingrédient près','Plan five dinners for this week':'Prévoir cinq dîners cette semaine','Talk to a person':'Parler à un conseiller',
+'Close':'Fermer','Back':'Retour','Send':'Envoyer','now':'maintenant','Just now':'À l’instant','Today, 8:02':'Aujourd’hui, 8h02',
+/* today */
+'Here’s what matters for your household today.':'Voici ce qui compte pour votre foyer aujourd’hui.','University concept':'Concept universitaire','Demo data':'Données de démo','Scenarios':'Scénarios',
+'Replenish':'Réapprovisionner','Meal plan':'Menu de la semaine','Use soon':'À consommer vite','Plan my week':'Planifier ma semaine','See recipe':'Voir la recette','Compare refills':'Comparer les formats',
+'Use your spinach tonight.':'Utilisez vos épinards ce soir.','Creamy spinach penne · 20 min. You’d need penne, cooking cream and grated cheese.':'Penne crémeuses aux épinards · 20 min. Il faut des penne, de la crème et du fromage râpé.',
+'Small idea':'Petite idée','With the milk, sugar and flour already at home, adding eggs would let you make a simple cake.':'Avec le lait, le sucre et la farine déjà chez vous, des œufs suffiraient pour un gâteau simple.',
+'Not now':'Pas maintenant','Weekly food budget':'Budget alimentaire hebdo','Shopping in store today?':'Courses en magasin aujourd’hui ?','Your list is sorted by aisle, with your budget in view.':'Votre liste est triée par rayon, avec votre budget sous les yeux.','Start':'Démarrer',
+'Edit suggestion':'Modifier la suggestion','Edit':'Modifier','Snooze for 3 days':'Reporter de 3 jours','Snooze 3 days':'Reporter de 3 jours','Why this suggestion?':'Pourquoi cette suggestion ?','Dismiss suggestion':'Ignorer la suggestion','Dismiss':'Ignorer',
+'You’re all set for now.':'Tout est en ordre pour le moment.','I’ll let you know when something needs a look.':'Je vous préviendrai quand quelque chose demandera votre attention.',
+'This week’s dinners':'Les dîners de la semaine','5 dinners planned · ingredients in My List':'5 dîners prévus · ingrédients dans Ma liste','View':'Voir','Undo':'Annuler',
+'Hand soap: time to check.':'Savon : à vérifier.','Your dog food may have run out.':'Vos croquettes sont peut-être épuisées.','Your usual detergent may need a refill this week.':'Votre lessive habituelle est à racheter cette semaine.','Your usual detergent may need a refill next week.':'Votre lessive habituelle sera à racheter la semaine prochaine.',
+'Estimated from the date you opened the last bag and the 3-week duration you confirmed. Daily can’t see your actual stock.':'Estimé à partir de la date d’ouverture du dernier sac et de la durée de 3 semaines que vous avez confirmée. Daily ne voit pas votre stock réel.',
+'You usually shop on Thursdays and haven’t planned dinners yet this week.':'Vous faites souvent vos courses le jeudi et n’avez pas encore prévu vos dîners.',
+'Your baby spinach was bought Saturday; you marked it “best within 2–3 days”.':'Vos pousses d’épinard ont été achetées samedi ; vous les avez notées « à consommer sous 2–3 jours ».',
+'Estimated from your usual 2-week bottle. You can adjust it in My Home.':'Estimé d’après votre flacon habituel de 2 semaines. Modifiable dans Ma maison.',
+/* home */
+'Estimated stock for your recurring essentials.':'Stock estimé de vos produits du quotidien.','How estimates work.':'Comment fonctionnent les estimations.','Daily can’t see inside your cupboards. Estimates come from simulated purchase history and habits you confirmed. Correct them anytime.':'Daily ne voit pas dans vos placards. Les estimations viennent d’un historique d’achats simulé et des habitudes que vous avez confirmées. Corrigez-les à tout moment.',
+'Household essentials':'Produits du quotidien','Fast-forward 2 weeks':'Avancer de 2 semaines','✓ Reminder on':'✓ Rappel activé','Remind me':'Me le rappeler','Add refill':'Racheter','Adjust estimate':'Ajuster l’estimation','✓ In your list':'✓ Dans votre liste',
+'Expiry you confirmed or simulated':'Dates confirmées ou simulées','Use by tomorrow':'À consommer demain','Check today':'À vérifier aujourd’hui','No date':'Sans date','Cook the spinach tonight':'Cuisiner les épinards ce soir','Household profile':'Profil du foyer','Review data':'Voir les données',
+'300 g bag':'sachet 300 g','4 onions':'4 oignons','2 bulbs':'2 têtes','about 600 g':'environ 600 g','about 700 g':'environ 700 g','Bought Saturday':'Acheté samedi','Bought last week':'Acheté la semaine dernière','You confirmed':'Confirmé par vous',
+'cooks most evenings':'cuisine presque tous les soirs','cooks a few evenings':'cuisine quelques soirs','cooks rarely':'cuisine rarement',
+/* list */
+'Demo prices':'Prix de démo','Food budget':'Budget alimentaire','Food':'Alimentation','Household & pets':'Entretien et animaux','Estimated total':'Total estimé','Demo prices and offers from a fixed fictional catalog.':'Prix et offres de démo issus d’un catalogue fictif.','Choose Drive or delivery':'Choisir Drive ou livraison',
+'Your list is empty. Ask Auchan to plan your week, or browse Shop.':'Votre liste est vide. Demandez à Auchan de planifier votre semaine, ou parcourez Courses.','5-dinner plan':'Menu de 5 dîners','Ingredients added from your plan':'Ingrédients ajoutés depuis votre menu','Edit plan':'Modifier le menu',
+'Make it a complete dinner with grated cheese and a side salad.':'Faites-en un dîner complet avec du fromage râpé et une salade.',
+'Fruit & vegetables':'Fruits et légumes','Dairy & eggs':'Produits laitiers et œufs','Meat & fish':'Viandes et poissons','Pasta, rice & pantry':'Pâtes, riz et épicerie','Bakery':'Boulangerie','Coffee & drinks':'Café et boissons','Household':'Entretien','Pets':'Animaux',
+'Meal plan ':'Menu','Cake idea':'Idée gâteau','Recipe':'Recette','Refill':'Rachat','Scanned':'Scanné','In-store idea':'Idée en magasin','Dinner idea':'Idée dîner','Suggested':'Suggéré','Loyalty price':'Prix fidélité','This week':'Cette semaine',
+/* shop */
+'Demo catalog':'Catalogue de démo','All':'Tout','Offers':'Promos','Fresh produce':'Frais','Pantry':'Épicerie','Drinks':'Boissons','Loyalty card':'Carte fidélité','demo':'démo','available on your next order':'disponible sur votre prochaine commande',
+'Drive pickup or home delivery':'Drive ou livraison à domicile','Click & collect or home delivery':'Retrait en magasin ou livraison','Next free slot suggested by Daily':'Prochain créneau libre suggéré par Daily','Slots':'Créneaux','Search products':'Rechercher un produit',
+'Auchan demo store':'Magasin Auchan de démo','Alcampo demo store':'Magasin Alcampo de démo','Lille area':'région lilloise','Madrid area':'région de Madrid','Warsaw area':'région de Varsovie','Drive pickup':'Drive','Click & collect':'Retrait en magasin',
+'approx. 1 kg':'environ 1 kg','1.5 kg bag':'sac de 1,5 kg','pack of 3':'lot de 3','pack of 4':'lot de 4','pack of 7':'lot de 7','pack of 8':'lot de 8','pack of 40':'boîte de 40','box of 6':'boîte de 6','3 bulbs':'3 têtes','3 kg bag':'sac de 3 kg','1.5 L':'1,5 L','Other store':'Autre magasin',
+/* sheets: plan / recipe */
+'Your week of dinners':'Vos dîners de la semaine','Uses what you have':'Utilise ce que vous avez','Swap':'Changer','Already at home':'Déjà chez vous','Already in your list':'Déjà dans votre liste','Missing ingredients':'Ingrédients manquants','Everything is covered.':'Tout est couvert.','Nothing matched.':'Aucune correspondance.',
+'Estimated plan cost':'Coût estimé du menu','Food list after adding':'Liste alimentaire après ajout','Regenerate plan':'Générer un autre menu','Save this plan':'Enregistrer ce menu',
+'Five quick dinners for your household, built around the rice, onions and spinach you have. Shared items like lemons and cheese are counted once.':'Cinq dîners rapides pour votre foyer, autour du riz, des oignons et des épinards que vous avez. Les produits communs comme les citrons et le fromage ne sont comptés qu’une fois.',
+'Lemon garlic chicken with rice':'Poulet citron-ail et riz','Creamy spinach penne':'Penne crémeuses aux épinards','Coral lentil coconut curry':'Curry de lentilles corail au coco','Baked salmon with courgettes':'Saumon au four et courgettes','Veggie fajitas':'Fajitas végétariennes','Homemade burgers & salad':'Burgers maison et salade','Tomato basil penne':'Penne tomate-basilic','Spinach & cheese omelette':'Omelette épinards-fromage',
+'Tonight: creamy spinach penne':'Ce soir : penne crémeuses aux épinards','Uses your spinach':'Utilise vos épinards','Missing':'Manquant','At home':'Chez vous','In your list':'Dans votre liste','Your spinach is best within a day. This recipe uses the whole bag and takes 20 minutes.':'Vos épinards sont à consommer sous un jour. Cette recette utilise tout le sachet en 20 minutes.',
+'Steps: cook penne 11 min. Soften garlic in a pan, add cream and spinach until wilted, stir in pasta and cheese.':'Étapes : cuire les penne 11 min. Faire revenir l’ail, ajouter la crème et les épinards jusqu’à ce qu’ils tombent, mélanger avec les pâtes et le fromage.',
+'I cooked it · remove spinach from Use soon':'C’est cuisiné · retirer les épinards','all ingredients ready':'tous les ingrédients sont prêts','✓ Ready to cook':'✓ Prêt à cuisiner',
+/* detergent / estimate */
+'Refill your detergent':'Racheter de la lessive','Larger format: what changes':'Grand format : ce qui change','Today’s order':'Commande du jour','Cost per load':'Coût par lavage','Next refill':'Prochain rachat','Adjust laundry estimate':'Ajuster l’estimation lessive',
+'The XL bottle raises today’s total but lasts about twice as long at a lower price per load. Both are demo prices; choose whichever suits you.':'Le bidon XL augmente le total du jour mais dure environ deux fois plus longtemps, à un prix par lavage plus bas. Prix de démo ; choisissez ce qui vous convient.',
+'When did you buy or open it?':'Quand l’avez-vous acheté ou ouvert ?','One usually lasts:':'Un exemplaire dure en général :','Use suggestion':'Utiliser la suggestion','Estimated refill date':'Date de rachat estimée','Save estimate':'Enregistrer',
+'We’ll start with these estimates. You can adjust them anytime. Daily can’t observe what you actually use.':'Nous partons de ces estimations, modifiables à tout moment. Daily ne peut pas observer votre consommation réelle.','Now':'Maintenant',
+'Food at home':'Aliments à la maison','Items you confirmed or that come from simulated purchases. Correct anything that’s off.':'Produits confirmés par vous ou issus d’achats simulés. Corrigez ce qui ne va pas.','Used':'Consommé','Sooner':'Plus tôt','Later':'Plus tard',
+/* checkout */
+'Drive, delivery or store':'Drive, livraison ou magasin','Home delivery':'Livraison à domicile','In store':'En magasin','Why?':'Pourquoi ?','Available slots (simulated)':'Créneaux disponibles (simulés)','Available':'Disponible','Full':'Complet','Thu':'Jeu','Fri':'Ven','Sat':'Sam','Thu ★':'Jeu ★',
+'Suggested: Thursday 18:00–18:30 pickup':'Suggéré : jeudi 18h00–18h30 en Drive','Suggested: Thursday 18:00–18:30 delivery':'Suggéré : jeudi 18h00–18h30 en livraison','Suggested: Thursday after 18:00 in store':'Suggéré : jeudi après 18h en magasin',
+'Drive pickup is free in this demo and takes about 5 minutes.':'Le Drive est gratuit dans cette démo et prend environ 5 minutes.','Store traffic is usually lighter after 18:00 (simulated).':'Le magasin est souvent plus calme après 18h (simulé).',
+'Your dog food is estimated to run low next week. Add your usual bag to this order?':'Vos croquettes devraient manquer la semaine prochaine. Ajouter votre sac habituel à cette commande ?','Not yet':'Pas encore','Pickup fee (demo)':'Frais de retrait (démo)','Delivery fee (demo)':'Frais de livraison (démo)','Free':'Gratuit',
+'Demo only: nothing is ordered or paid.':'Démo uniquement : rien n’est commandé ni payé.','Start in-store mode':'Lancer le mode magasin',
+'Demo order confirmed':'Commande de démo confirmée','You’re all set.':'C’est tout bon.','DEMO ORDER · not a real purchase':'COMMANDE DE DÉMO · pas un vrai achat','Total (demo)':'Total (démo)','Done':'Terminé',
+/* notifs & settings */
+'Notifications':'Notifications','In-app previews only. This demo never sends push notifications.':'Aperçus dans l’app uniquement. Cette démo n’envoie jamais de notifications push.','Welcome to Auchan Daily':'Bienvenue sur Auchan Daily','Your household estimates are ready to review.':'Les estimations de votre foyer sont prêtes.','Mark all read':'Tout marquer comme lu','Preview a reminder':'Aperçu d’un rappel',
+'Dog food reminder':'Rappel croquettes','Your dog food may run out in 3 days. Add it to Thursday’s Drive?':'Vos croquettes risquent de manquer dans 3 jours. Les ajouter au Drive de jeudi ?','Refund added (demo)':'Remboursement ajouté (démo)',
+'You & your data':'Vous et vos données','Personalized suggestions':'Suggestions personnalisées','Use your household profile to tailor ideas':'Utilise le profil de votre foyer','Use purchase history':'Utiliser l’historique d’achats','Simulated history drives stock estimates':'L’historique simulé alimente les estimations','Replenishment reminders':'Rappels de rachat','In-app previews for essentials':'Aperçus dans l’app pour l’essentiel','Relevant offers':'Offres pertinentes','Only for items you buy or plan to cook':'Seulement pour ce que vous achetez ou cuisinez','Quiet hours':'Heures calmes','No reminders 21:00–08:00':'Aucun rappel entre 21h et 8h',
+'Language':'Langue','First name':'Prénom','International demo':'Démo internationale','Adapts sample products, currency and fulfilment. The interface stays in English.':'Adapte les produits d’exemple, la devise et le mode de retrait.','France':'France','Spain':'Espagne','Poland':'Pologne','French':'français','Spanish':'espagnol','Polish':'polonais',
+'Stored household data (simulated)':'Données du foyer enregistrées (simulées)','Laundry':'Lessive','Essentials estimates':'Estimations','Chat messages':'Messages','Stored where':'Stockées où','This browser only':'Ce navigateur uniquement','Redo household setup':'Refaire la configuration','Reset profile data':'Réinitialiser le profil','Tap again to confirm':'Touchez encore pour confirmer','Demo scenarios & reset':'Scénarios de démo et réinitialisation',
+'About this prototype':'À propos de ce prototype','Auchan Daily is an unofficial Auchan × EDHEC university concept. All products, prices, people and results are fictional demo data.':'Auchan Daily est un concept universitaire non officiel Auchan × EDHEC. Produits, prix, personnes et résultats sont des données de démo fictives.',
+'Estimates, meal plans, smart list, Drive/delivery suggestions, scripted assistant, human handover, in-app reminders.':'Estimations, menus, liste intelligente, suggestions Drive/livraison, assistant scénarisé, relais humain, rappels dans l’app.',
+'Shelf NFC tags, product photo recognition and the Smart Basket Scan station need in-store hardware and are simulated here.':'Étiquettes NFC en rayon, reconnaissance photo et borne Smart Basket Scan nécessitent du matériel en magasin et sont simulées ici.','MVP':'MVP','Future':'Futur',
+'Suggestions use simulated purchase history and the habits you confirmed. You can change or turn them off in You & your data.':'Les suggestions utilisent un historique simulé et les habitudes que vous avez confirmées. Modifiables ou désactivables dans Vous et vos données.','Personalization settings':'Réglages de personnalisation',
+/* chat */
+'I plan meals, watch your essentials and sort out orders. You stay in control of every addition.':'Je prévois vos repas, surveille l’essentiel et règle vos commandes. Vous validez chaque ajout.','Scripted demo assistant':'Assistant de démo scénarisé',
+'Plan my meals for the week.':'Planifie mes repas de la semaine.','What can I cook with what I have?':'Que puis-je cuisiner avec ce que j’ai ?','Help me stay within my budget.':'Aide-moi à respecter mon budget.','When should I buy dog food again?':'Quand racheter des croquettes ?','Something is missing from my order.':'Il manque quelque chose dans ma commande.','I want to talk to a person':'Je veux parler à un conseiller','Complete my pasta dinner':'Compléter mon dîner de pâtes',
+'Message Ask Auchan':'Message à Auchan','Ask Auchan anything…':'Posez votre question à Auchan…','Clear conversation':'Effacer la conversation','Review & swap':'Revoir et changer','Combined extra cost':'Surcoût total','No thanks':'Non merci','✓ Added to My List':'✓ Ajouté à Ma liste','Not added':'Non ajouté',
+'Plan dinners within budget':'Prévoir des dîners dans le budget','See this week’s loyalty prices':'Voir les prix fidélité de la semaine','Adjust the estimate':'Ajuster l’estimation','Compare formats':'Comparer les formats','Open My Home':'Ouvrir Ma maison','See slots':'Voir les créneaux',
+'Demo order':'Commande de démo','Yesterday':'Hier','Upcoming':'À venir','Summary for the advisor':'Résumé pour le conseiller','Customer':'Client','Topic':'Sujet','Order':'Commande','Market':'Marché','Shared':'Partagé','Share & connect':'Partager et contacter','Cancel':'Annuler','✓ Shared with your consent':'✓ Partagé avec votre accord','Not shared':'Non partagé',
+'General request':'Demande générale','Missing item from order':'Article manquant dans la commande','Customer service (simulated)':'Service client (simulé)','Multilingual support':'Assistance multilingue','Translation example · demo':'Exemple de traduction · démo','Advisor replied (English)':'Le conseiller a répondu (anglais)','Customer sees:':'Le client voit :','Scripted example. No live translation service is used.':'Exemple scénarisé. Aucun service de traduction réel n’est utilisé.',
+/* store */
+'Demo':'Démo','Your basket':'Votre panier','Running basket total':'Total du panier','items picked':'articles pris','Scan (simulated)':'Scanner (simulé)','Product NFC tap':'Tap NFC produit','Pilot':'Pilote','needs shelf tags':'nécessite des étiquettes','Photo recognition':'Reconnaissance photo','Near-term concept':'Concept à court terme','Smart Basket Scan':'Smart Basket Scan','Future station':'Borne future',
+'Loyalty price on your yogurts':'Prix fidélité sur vos yaourts','Already on your list':'Déjà dans votre liste','Applied':'Appliqué','XL detergent instead?':'Lessive XL à la place ?','Only for items you already planned. Demo offers.':'Uniquement sur ce que vous aviez prévu. Offres de démo.','Alternative':'Alternative',
+'Simulated journey. Nothing is scanned, charged or paid.':'Parcours simulé. Rien n’est scanné, facturé ni payé.','Exit in-store mode':'Quitter le mode magasin','Simulates tapping your phone on a shelf tag. No real NFC is read.':'Simule le fait de poser le téléphone sur une étiquette. Aucun NFC réel n’est lu.',
+'Choose a sample product to simulate a successful scan':'Choisissez un produit pour simuler un scan réussi','Scan':'Scanner','Simulates recognising a product photo. Choose a sample product; no photo is analysed.':'Simule la reconnaissance d’une photo produit. Aucune photo n’est analysée.','A future checkout station that would read the whole basket at once. Simulated with sample data.':'Une future borne qui lirait tout le panier d’un coup. Simulée avec des données d’exemple.',
+'Simulate station scan':'Simuler le scan de la borne','Everything on your list is picked.':'Tout est dans le panier.','Burger buns scanned. Want to complete the meal?':'Pains burger scannés. Compléter le repas ?','Beef burger patties are on offer this week':'Steaks hachés en promo cette semaine','Optional condiment':'Condiment facultatif','Add':'Ajouter','Skip':'Passer','✓ Added':'✓ Ajouté','Skipped':'Passé','Accepted items are added to your basket total immediately.':'Les articles acceptés s’ajoutent immédiatement au total.',
+'Product alternative':'Produit alternatif','Basket impact':'Impact sur le panier','Basket summary':'Récapitulatif du panier','DEMO · not a real payment':'DÉMO · pas un vrai paiement','Pay at any checkout (simulated)':'Payez à n’importe quelle caisse (simulé)','Back to Daily':'Retour à Daily',
+/* presenter */
+'Presenter panel':'Panneau présentateur','unofficial university concept':'concept universitaire non officiel','Demo scenarios':'Scénarios de démo','Refill household essentials':'Racheter l’essentiel','Shop in store':'Courses en magasin','Resolve an order issue':'Régler un problème de commande','Pick a scenario to reset to a consistent starting state and get a step-by-step guide.':'Choisissez un scénario pour repartir d’un état cohérent et suivre un guide pas à pas.',
+'Basket value':'Valeur du panier','Starting basket':'Panier de départ','Accepted recommendations':'Recommandations acceptées','Other changes':'Autres changements','Final simulated basket':'Panier final simulé','Demonstration calculations from a fixed fictional catalog, not measured business results.':'Calculs de démonstration sur un catalogue fictif, pas des résultats mesurés.','Showing the last demo order.':'Dernière commande de démo affichée.','Demonstration calculations from a fixed fictional catalog, not measured business results. Showing the last demo order.':'Calculs de démonstration sur un catalogue fictif, pas des résultats mesurés. Dernière commande de démo affichée.',
+'Reset demo':'Réinitialiser','Show onboarding':'Revoir l’accueil','Preview reminder':'Aperçu d’un rappel','Market (demo)':'Marché (démo)','What’s real vs future':'Réaliste ou futur','Scenario complete':'Scénario terminé','Show me':'Montrer',
+'Estimates, meal plans, smart list, Drive/delivery suggestion, scripted assistant, handover, in-app reminders, photo recognition (near-term).':'Estimations, menus, liste intelligente, suggestion Drive/livraison, assistant scénarisé, relais humain, rappels, reconnaissance photo (court terme).','Shelf NFC tags and the Smart Basket Scan station need store hardware.':'Les étiquettes NFC et la borne Smart Basket Scan nécessitent du matériel en magasin.',
+'Open “Plan five dinners” on Today':'Ouvrir « Prévoir cinq dîners » dans Aujourd’hui','Swap a meal, then add the missing ingredients':'Changer un repas puis ajouter les ingrédients manquants','Accept the cake idea: add eggs':'Accepter l’idée gâteau : ajouter des œufs','Open My List: aisles, budget, totals':'Ouvrir Ma liste : rayons, budget, totaux','Choose Drive and place the demo order':'Choisir le Drive et passer la commande de démo',
+'Review estimates in My Home':'Revoir les estimations dans Ma maison','Compare detergent formats and pick one':'Comparer les formats de lessive et en choisir un','Prepare a Drive order: accept the dog food prompt':'Préparer un Drive : accepter les croquettes proposées','Place the demo order':'Passer la commande de démo',
+'Tap “Shop this list in store”':'Toucher « Faire cette liste en magasin »','Simulate an NFC tap on the burger buns':'Simuler un tap NFC sur les pains burger','Accept the patties; skip or add the condiment':'Accepter les steaks ; ajouter ou non le condiment','Try photo recognition or Smart Basket Scan':'Essayer la reconnaissance photo ou Smart Basket Scan','Finish and review the basket':'Terminer et revoir le panier',
+'Ask: “Something is missing from my order.”':'Demander : « Il manque quelque chose dans ma commande. »','Mark the eggs as missing':'Signaler les œufs manquants','Choose “Talk to a person”':'Choisir « Parler à un conseiller »','Share the summary and meet the advisor':'Partager le résumé et rencontrer le conseiller','Show the translated message example':'Montrer l’exemple de message traduit',
+'Unofficial Auchan × EDHEC university concept':'Concept universitaire non officiel Auchan × EDHEC',
+/* toasts */
+'Snoozed for 3 days':'Reporté de 3 jours','Dismissed. Nothing was added.':'Ignoré. Rien n’a été ajouté.','Reminder on. You’ll get an in-app preview.':'Rappel activé. Vous aurez un aperçu dans l’app.','Reminder off':'Rappel désactivé','Jumped ahead 2 weeks (demo time)':'Avance de 2 semaines (temps de démo)','New plan generated':'Nouveau menu généré','Plan saved':'Menu enregistré',
+'Nice! Spinach removed from Use soon':'Parfait ! Épinards retirés','Okay, nothing added':'D’accord, rien n’a été ajouté','Demo reset':'Démo réinitialisée','Dog food added to your list':'Croquettes ajoutées à votre liste','Make it a complete dinner':'Faites-en un dîner complet','Add grated cheese and a side salad? Tap to see options.':'Ajouter du fromage râpé et une salade ? Touchez pour voir.',
+};
+const DAYFR=s=>s.replace(/\bThu\b/g,'jeu.').replace(/\bFri\b/g,'ven.').replace(/\bSat\b/g,'sam.').replace(/(\d\d):(\d\d)/g,'$1h$2');
+const pl=(n,one,many)=>+n>1?many:one;
+const FR_RX=[
+[/^Your dog food may run out in (\d+) days?\.$/,(m,n)=>`Vos croquettes risquent de manquer dans ${n} ${pl(n,'jour','jours')}.`],
+[/^Add your usual (.+) \(3 kg\) to your next order\?$/,(m,a)=>`Ajouter votre sac habituel (${a}, 3 kg) à la prochaine commande ?`],
+[/^Plan five dinners within your (.+) budget\.$/,'Prévoyez cinq dîners dans votre budget de $1.'],
+[/^For (\d+) adults?, (\d+) min or less, using the rice, onions and spinach you already have\.$/,(m,a,b)=>`Pour ${a} ${pl(a,'adulte','adultes')}, ${b} min maximum, avec le riz, les oignons et les épinards que vous avez déjà.`],
+[/^Based on (\d+) loads a week, your bottle has (.+) left\.$/,'À $1 lessives par semaine, il vous reste : $2.'],
+[/^Your (\d+) ml bottle is estimated at (.+) left\.$/,'Flacon de $1 ml, il reste : $2.'],
+[/^Based on your usual purchases, your (.+) may last — it may already be empty\.$/,'D’après vos achats habituels, votre stock ($1) est peut-être déjà épuisé.'],
+[/^Based on your usual purchases, your (.+) may last (.+)\.$/,'D’après vos achats habituels, votre stock ($1) devrait durer encore $2.'],
+[/^Refill around (.+)\.$/,'Rachat vers le $1'],
+[/^Estimated (\d+)% remaining$/,'Environ $1 % restant'],
+[/^Estimated (.+) left\. Tap to review\.$/,'Reste estimé : $1. Touchez pour vérifier.'],
+[/^([\d,.]+ (?:€|zł)) of ([\d,.]+ (?:€|zł)) planned$/,'$1 sur $2 prévus'],
+[/^([\d,.]+ (?:€|zł)) of ([\d,.]+ (?:€|zł))$/,'$1 sur $2'],
+[/^Household & pet essentials tracked separately: (.+)$/,'Entretien et animaux suivis à part : $1'],
+[/^(.+) left for this week’s food\.$/,'Il reste $1 pour l’alimentation cette semaine.'],
+[/^(.+) over your budget\. Review optional items below\.$/,'$1 au-dessus du budget. Revoyez les articles facultatifs ci-dessous.'],
+[/^(\d+) items? · (\d+) checked off · grouped by aisle$/,'$1 articles · $2 cochés · par rayon'],
+[/^(\d+) essentials? to review$/,(m,n)=>`${n} ${pl(n,'produit','produits')} à vérifier`],
+[/^Assistant: (.+)\. Open contextual help$/,(m,a)=>`Assistant : ${T(a)}. Ouvrir l’aide`],
+[/^Notifications, (\d+) unread$/,'Notifications, $1 non lues'],
+[/^List ready · (.+)$/,'Liste prête · $1'],
+[/^Scenario ready: (.+)$/,(m,a)=>`Scénario prêt : ${T(a)}`],
+[/^(.+): (à vérifier|bientôt épuisé) · (.+) left$/,'$1 : $2 · reste $3'],
+[/^(.+): (time to check|running low)$/,(m,a,b)=>`${a} : ${b==='running low'?'bientôt épuisé':'à vérifier'}`],
+[/^Fast-forwarded (\d+) weeks?$/,(m,n)=>`Avance de ${n} ${pl(n,'semaine','semaines')}`],
+[/^(\d+) min · (\d+) servings · ~(.+) to buy$/,'$1 min · $2 portions · ~$3 à acheter'],
+[/^(\d+) min · ~(.+) to buy$/,'$1 min · ~$2 à acheter'],
+[/^(\d+) to buy$/,'$1 à acheter'],
+[/^(\d+) servings each$/,'$1 portions chacun'],[/^(\d+) servings$/,'$1 portions'],[/^(\d+) dinners$/,'$1 dîners'],
+[/^(\d+) items$/,'$1 articles'],[/^(\d+) products$/,'$1 produits'],[/^(\d+) loads$/,'$1 lavages'],[/^(\d+) adults?$/,(m,n)=>`${n} ${pl(n,'adulte','adultes')}`],[/^1 dog$/,'1 chien'],[/^1 cat$/,'1 chat'],
+[/^(\d+) laundry loads\/week$/,'$1 lessives/semaine'],[/^(\d+) loads\/week$/,'$1 lessives/semaine'],[/^max (\d+) min$/,'max $1 min'],
+[/^(\d+) adults, (\d+) children(, 1 dog)?$/,(m,a,b,d)=>`${a} adultes, ${b} enfants${d?', 1 chien':''}`],
+[/^Budget (.+)$/,'Budget $1'],
+[/^Add (\d+) missing ingredients · (.+)$/,'Ajouter les $1 ingrédients manquants · $2'],
+[/^Add (\d+) missing · (.+)$/,'Ajouter $1 manquants · $2'],[/^Add missing · (.+)$/,'Ajouter les manquants · $1'],[/^Add (\d+) · (.+)$/,'Ajouter $1 · $2'],
+[/^Add eggs · (.+)$/,'Ajouter des œufs · $1'],[/^Add bag · (.+)$/,'Ajouter le sac · $1'],[/^Add soap · (.+)$/,'Ajouter du savon · $1'],[/^Add usual bag · (.+)$/,'Ajouter le sac habituel · $1'],[/^Add to order · (.+)$/,'Ajouter à la commande · $1'],[/^See options · (.+)$/,'Voir les options · $1'],
+[/^View list & cart · (\d+) items · (.+)$/,'Voir liste et panier · $1 articles · $2'],
+[/^(Lun|Mar|Mer|Jeu|Ven) · (.+)$/,(m,a,b)=>`${a} · ${T(b)}`],
+[/^At (\d+) loads a week \(your setting\), here’s how the formats compare\.$/,'À $1 lessives par semaine (votre réglage), voici la comparaison des formats.'],
+[/^(.+) vs (.+) per load$/,'$1 contre $2 par lavage'],[/^(.+) per load$/,'$1 par lavage'],[/^(.+)\/load$/,'$1/lavage'],[/^≈ (\d+) weeks$/,'≈ $1 semaines'],
+[/^\+(.+) vs usual bottle$/,'+$1 par rapport au bidon habituel'],[/^in ≈ (\d+) weeks instead of (\d+)$/,'dans ≈ $1 semaines au lieu de $2'],[/^lasts ≈ (\d+) weeks instead of (\d+)$/,'dure ≈ $1 semaines au lieu de $2'],[/^\+(.+) today$/,'+$1 aujourd’hui'],
+[/^(\d+(?:\.\d)?) weeks$/,(m,n)=>`${n.replace('.',',')} semaines`],[/^Suggested for your household: about (\d+) weeks?\.$/,'Suggéré pour votre foyer : environ $1 semaine(s).'],
+[/^use within (\d+) d$/,'à consommer sous $1 j'],[/^Use within (\d+) days$/,'À consommer sous $1 jours'],
+[/^You usually shop on Thursdays, this slot shows good availability \(simulated\), and it arrives before your dog food is estimated to run low\. (.+)$/,(m,a)=>`Vous faites souvent vos courses le jeudi, ce créneau a de bonnes disponibilités (simulées) et arrive avant que vos croquettes ne manquent. ${T(a)}`],
+[/^Delivery adds a demo fee of (.+)\.$/,'La livraison ajoute des frais de démo de $1.'],
+[/^Place demo order · (.+)$/,(m,a)=>`Passer la commande de démo · ${DAYFR(a)}`],
+[/^(Thu|Fri|Sat) (\d\d:\d\d–\d\d:\d\d)$/,(m)=>DAYFR(m)],[/^(\d\d:\d\d–\d\d:\d\d)$/,(m)=>DAYFR(m)],
+[/^(.+) · (Thu|Fri|Sat) (\d\d:\d\d–\d\d:\d\d)\. Nothing was ordered or paid\.$/,(m,a,b,c)=>`${T(a)} · ${DAYFR(b+' '+c)}. Rien n’a été commandé ni payé.`],
+[/^Order (DM-\d+)\. I’ll send a reminder preview before your slot\.$/,'Commande $1. Je vous enverrai un rappel avant votre créneau.'],[/^Order (DM-\d+)$/,'Commande $1'],
+[/^Refund (.+) to loyalty balance$/,'Rembourser $1 sur la cagnotte'],[/^✓ (.+) added to your loyalty balance \(demo\)$/,'✓ $1 ajoutés à votre cagnotte (démo)'],[/^(.+) credited to your loyalty balance\.$/,'$1 crédités sur votre cagnotte.'],
+[/^Missing item from order (DM-\d+)$/,'Article manquant, commande $1'],[/^(.+) missing$/,'$1 manquant'],[/^Last (\d+) messages$/,'$1 derniers messages'],[/^(.+) \(demo profile\)$/,'$1 (profil de démo)'],
+[/^Customer wrote \((.+)\)$/,(m,a)=>`Le client a écrit (${T(a)})`],[/^Advisor sees: (.+)$/,'Le conseiller voit : $1'],
+[/^(.+) · Customer service \(simulated\)$/,'$1 · Service client (simulé)'],
+[/^Finish shopping · (.+)$/,'Terminer les courses · $1'],[/^Aisle (\d+)$/,'Rayon $1'],[/^On your list$/,'Dans votre liste'],[/^Not on your list$/,'Pas dans votre liste'],
+[/^Would read all (\d+) unpicked items in your basket in one pass\.$/,'Lirait d’un coup les $1 articles restants du panier.'],[/^basket impact (.+)$/,'impact sur le panier $1'],
+[/^Scanned (.+) · \+(.+)$/,'Scanné : $1 · +$2'],[/^Picked (.+) · \+(.+)$/,'Pris : $1 · +$2'],[/^Station read (\d+) items \(simulated\)$/,'La borne a lu $1 articles (simulé)'],
+[/^Added (\d+) ingredients · (.+)$/,'$1 ingrédients ajoutés · $2'],[/^Added (\d+) items · (.+)$/,'$1 articles ajoutés · $2'],[/^Added (\d+) · (.+)$/,'$1 ajoutés · $2'],[/^Added (.+) · \+?(.+)$/,'Ajouté : $1 · $2'],
+[/^Eggs added · (.+)$/,'Œufs ajoutés · $1'],[/^Swapped to (.+)$/,'Remplacé par $1'],[/^Removed (.+)$/,'Retiré : $1'],[/^(.+) marked as used$/,'$1 marqué comme consommé'],[/^Market: (.+) · prices in (.+)$/,(m,a,b)=>`Marché : ${T(a)} · prix en ${b}`],
+[/^(Drive pickup|Home delivery) · (.+)$/,(m,a,b)=>`${T(a)} · ${DAYFR(b)}`],
+[/^Check off (.+)$/,'Cocher $1'],[/^Uncheck (.+)$/,'Décocher $1'],[/^Decrease (.+)$/,'Diminuer $1'],[/^Increase (.+)$/,'Augmenter $1'],[/^Mark (.+) as picked$/,'Marquer $1 comme pris'],[/^Skip (.+)$/,'Passer $1'],[/^Swap to (.+)$/,'Remplacer par $1'],[/^Swap (.+)$/,(m,a)=>'Changer '+T(a)],[/^Keep (.+)$/,'Garder $1'],[/^Add (.+)$/,'Ajouter $1'],
+];
+function T(s){
+  if(!S||S.lang!=='fr'||!s) return s;
+  const k=s.trim(); if(!k||!/[A-Za-z]/.test(k)) return s;
+  let out=FR[k];
+  if(out===undefined){ for(const [r,f] of FR_RX){ if(r.test(k)){ out=k.replace(r,f); break; } } }
+  if(out===undefined&&k.includes(' · ')){ const parts=k.split(' · '), tp=parts.map(p=>T(p)); if(tp.some((p,i)=>p!==parts[i])) out=tp.join(' · '); }
+  if(out===undefined&&/ ·$/.test(k)){ const b=T(k.slice(0,-2)); if(b!==k.slice(0,-2)) out=b+' ·'; }
+  return out===undefined?s:s.replace(k,out);
+}
+const TR_ATTR=['aria-label','placeholder','title'];
+function translateDOM(root){
+  if(!root||!S||S.lang!=='fr') return;
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentNode&&/^(SCRIPT|STYLE)$/.test(n.parentNode.nodeName)?2:1});
+  let n; while((n=w.nextNode())){ const v=n.nodeValue; if(/[A-Za-z]/.test(v)){ const t=T(v); if(t!==v) n.nodeValue=t; } }
+  root.querySelectorAll('[aria-label],[placeholder],[title]').forEach(el=>TR_ATTR.forEach(a=>{ const v=el.getAttribute(a); if(v){ const t=T(v); if(t!==v) el.setAttribute(a,t); } }));
 }
 </script>
 <script>
@@ -1118,11 +1340,12 @@ function render(){
   else { f.className='full'; f.setAttribute('aria-hidden','true'); f.innerHTML=''; }
   $('onb').innerHTML=S.onboarded?'':onbHTML();
   $('presenter').innerHTML=presenterHTML();
+  translateDOM($('screen')); translateDOM($('presenter')); document.documentElement.lang=S.lang==='fr'?'fr':'en';
   if(aid){ const el=$(aid); if(el&&el!==document.activeElement){ el.focus({preventScroll:true}); try{ if(sel!=null) el.setSelectionRange(sel,sel);}catch(e){} } }
   save();
 }
-let bT; function banner(title,body,action){ const b=$('banner'); b.innerHTML=`<span class="b-app">${bird(28)}</span><span style="flex:1;min-width:0"><b>${esc(title)}</b><small>${esc(body)}</small></span><span class="faint">now</span>`; b.dataset.a=action?action[0]:'sheet'; b.dataset.v=action?action[1]:'notifs'; b.classList.add('on'); clearTimeout(bT); bT=setTimeout(()=>b.classList.remove('on'),4200); }
-let tT; function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('on'); clearTimeout(tT); tT=setTimeout(()=>e.classList.remove('on'),2200); }
+let bT; function banner(title,body,action){ const b=$('banner'); b.innerHTML=`<span class="b-app">${bird(28)}</span><span style="flex:1;min-width:0"><b>${esc(T(title))}</b><small>${esc(T(body))}</small></span><span class="faint">now</span>`; b.dataset.a=action?action[0]:'sheet'; b.dataset.v=action?action[1]:'notifs'; b.classList.add('on'); clearTimeout(bT); bT=setTimeout(()=>b.classList.remove('on'),4200); }
+let tT; function toast(t){ const e=$('toast'); e.textContent=T(t); e.classList.add('on'); clearTimeout(tT); tT=setTimeout(()=>e.classList.remove('on'),2200); }
 function advanceFor(evt){
   const sc=SCEN.find(s=>s.id===S.scenario); if(!sc) return;
   const j=S.step; if(j<sc.steps.length){ const t=sc.steps[j][2]; if(t===evt||(t==='scan:any'&&evt.startsWith('scan:'))) S.step=j+1; }
@@ -1133,7 +1356,7 @@ function maybeNudge(id){ if((id==='pasta'||id==='tomsauce')&&inList('pasta')&&in
 function openSheet(k,arg){ ui.sheet=k; ui.arg=arg; ui.cap=false; if(k==='plan') ui.plan=null; if(k==='settings') ui.confirmReset=false; render(); advanceFor('sheet:'+k); }
 function blk(ref){ const [m,b]=ref.split(':').map(Number); return S.chat[m].b[b]; }
 function startScenario(id){
-  const keepC=S.country; S=freshState(); S.country=keepC; S.onboarded=true; S.scenario=id; S.step=0;
+  const keepC=S.country, kl=S.lang, kn=S.name; S=freshState(); S.country=keepC; S.lang=kl||'en'; S.name=kn; S.onboarded=true; S.scenario=id; S.step=0;
   if(id==='store') S.list=['bananas','apples','buns','yogurt','pasta','tomsauce','coffee','detergent'].map(p=>({p,q:1,ck:0})), S.nudged=1;
   if(id==='issue') S.nudged=1;
   S.startValue=listTotal();
@@ -1142,7 +1365,7 @@ function startScenario(id){
 }
 function fastForward(){
   S.day+=14; const msgs=[];
-  Object.keys(S.ess).forEach(id=>{ if(id==='dogfood'&&!S.hh.dog)return; const st=essState(id); if(st[0]!=='ok'&&S.ess[id].remind) msgs.push([`${ESS_DEF[id].label}: ${st[1].toLowerCase()}`,`Estimated ${daysTxt(remaining(id))} left. Tap to review.`]); });
+  Object.keys(S.ess).forEach(id=>{ if(!essOn(id))return; const st=essState(id); if(st[0]!=='ok'&&S.ess[id].remind) msgs.push([`${essLabel(id)}${L(':',' :')} ${st[1].toLowerCase()}`,`Estimated ${daysTxt(remaining(id))} left. Tap to review.`]); });
   msgs.forEach((m,i)=>notify(m[0],m[1],false));
   if(msgs.length) banner(msgs[0][0],msgs[0][1],['tab','today']);
   toast('Jumped ahead 2 weeks (demo time)'); advanceFor('ff');
@@ -1186,7 +1409,7 @@ const A={
   country(v){ S.country=v; S.startValue=S.startValue; toast(`Market: ${C().name} · prices in ${C().cur}`); render(); },
   redoSetup(){ S.onboarded=false; ui.onb=0; ui.sheet=null; render(); },
   resetProfile(){ if(!ui.confirmReset){ ui.confirmReset=true; render(); return; } A.reset(); },
-  reset(){ const c=S.country; S=freshState(); S.country=c; S.startValue=listTotal(); Object.assign(ui,{sheet:null,plan:null,sel:{},cap:false,typing:false,q:'',cat:'all',onb:0,confirmReset:false}); ui.tab='today'; lastTab=null; render(); toast('Demo reset'); },
+  reset(){ const c=S.country, kl=S.lang, kn=S.name; S=freshState(); S.country=c; S.lang=kl; S.name=kn; if(kl) S.onboarded=true; S.startValue=listTotal(); Object.assign(ui,{sheet:null,plan:null,sel:{},cap:false,typing:false,q:'',cat:'all',onb:0,confirmReset:false}); ui.tab='today'; lastTab=null; render(); toast('Demo reset'); },
   ask(v){ ui.sheet=null; send(v); },
   sendq(){ const i=$('askq'); const v=i.value.trim(); if(v){ i.value=''; send(v);} },
   clearChat(){ S.chat=[]; S.topic=null; render(); },
@@ -1195,11 +1418,11 @@ const A={
   blkSel(v,e){ const s=ui.sel[v]; s[e.dataset.p]=!s[e.dataset.p]; render(); },
   blkAddSel(v){ const b=blk(v), ids=b.ids.filter(i=>ui.sel[v][i]); ids.forEach(i=>addItem(i,b.src)); b.done='added'; toast(`Added ${ids.length} · ${money(sum(ids))}`); render(); },
   missing(v,e){ const b=blk(v), p=e.dataset.p; b.done=p; S.orders[0].issue=p; S.topic='Missing item from order '+S.orders[0].id;
-    S.chat.push({r:'u',t:`The ${nm(p).toLowerCase()} ${/s$/.test(nm(p))?'are':'is'} missing.`}); S.chat.push(aiMsg(`Thanks, I’ve noted the missing ${nm(p).toLowerCase()} (${money(pr(p))}). How would you like to resolve it?`,[{k:'resolve',p}])); render(); scrollChat(); advanceFor('missing'); },
-  refund(v){ const b=blk(v); S.loyalty+=P[b.p].p; b.done=`${money(pr(b.p))} added to your loyalty balance (demo)`; S.chat.push(aiMsg('Done. The amount is on your loyalty balance for your next order. This is a demo, so no real money moved.')); notify('Refund added (demo)',`${money(pr(b.p))} credited to your loyalty balance.`,false); render(); scrollChat(); },
-  handover(v){ const b=blk(v); b.done='yes'; S.chat.push({r:'sys',t:'Connecting you to customer service… · simulated advisor'}); render(); scrollChat(); advanceFor('handover');
-    setTimeout(()=>{ const p=S.orders[0].issue; S.chat.push({r:'sys',t:'Camille joined the conversation'}); S.chat.push({r:'ag',t:`Hi Léa, I’m Camille. I’ve read the summary, so no need to repeat anything.${p?` I can confirm the ${nm(p).toLowerCase()} from order ${S.orders[0].id} and I’ve credited it to your loyalty balance.`:''} Is there anything else I can do?`});
-      S.chat.push(aiMsg('For customers who write in their own language, advisors can work in theirs. Here’s an example:',[{k:'translate'}])); render(); scrollChat(); advanceFor('translate'); }, reduced()?50:1400); },
+    S.chat.push({r:'u',t:L(`The ${nm(p).toLowerCase()} ${/s$/.test(nm(p))?'are':'is'} missing.`,`Il manque : ${nm(p).toLowerCase()}.`)}); S.chat.push(aiMsg(L(`Thanks, I’ve noted the missing ${nm(p).toLowerCase()} (${money(pr(p))}). How would you like to resolve it?`,`Merci, j’ai noté l’article manquant : ${nm(p).toLowerCase()} (${money(pr(p))}). Comment souhaitez-vous régler cela ?`),[{k:'resolve',p}])); render(); scrollChat(); advanceFor('missing'); },
+  refund(v){ const b=blk(v); S.loyalty+=P[b.p].p; b.done=`${money(pr(b.p))} added to your loyalty balance (demo)`; S.chat.push(aiMsg(L('Done. The amount is on your loyalty balance for your next order. This is a demo, so no real money moved.','C’est fait. Le montant est sur votre cagnotte pour la prochaine commande. C’est une démo : aucun argent réel n’a circulé.'))); notify('Refund added (demo)',`${money(pr(b.p))} credited to your loyalty balance.`,false); render(); scrollChat(); },
+  handover(v){ const b=blk(v); b.done='yes'; S.chat.push({r:'sys',t:L('Connecting you to customer service… · simulated advisor','Mise en relation avec le service client… · conseiller simulé')}); render(); scrollChat(); advanceFor('handover');
+    setTimeout(()=>{ const p=S.orders[0].issue; S.chat.push({r:'sys',t:L('Camille joined the conversation','Camille a rejoint la conversation')}); S.chat.push({r:'ag',t:L(`Hi ${S.name}, I’m Camille. I’ve read the summary, so no need to repeat anything.${p?` I can confirm the ${nm(p).toLowerCase()} from order ${S.orders[0].id} and I’ve credited it to your loyalty balance.`:''} Is there anything else I can do?`,`Bonjour ${S.name}, je suis Camille. J’ai lu le résumé, inutile de tout répéter.${p?` Je confirme l’article manquant (${nm(p).toLowerCase()}) de la commande ${S.orders[0].id} et je l’ai crédité sur votre cagnotte.`:''} Puis-je faire autre chose pour vous ?`)});
+      S.chat.push(aiMsg(L('For customers who write in their own language, advisors can work in theirs. Here’s an example:','Quand un client écrit dans sa langue, le conseiller peut répondre dans la sienne. Voici un exemple :'),[{k:'translate'}])); render(); scrollChat(); advanceFor('translate'); }, reduced()?50:1400); },
   store(){ S.storeOn=true; ui.sheet=null; ui.cap=false; render(); advanceFor('store'); },
   storeExit(){ S.storeOn=false; ui.sheet=null; render(); },
   scan(v){ openSheet('scan',v); },
@@ -1212,8 +1435,16 @@ const A={
   storeFinish(){ openSheet('storeDone'); advanceFor('storeFinish'); },
   scenario(v){ startScenario(v); },
   go(v){ const [k,...r]=v.split(':'); const a=r.join(':'); ({sheet:()=>openSheet(a),tab:()=>A.tab(a),ff:()=>A.ff(),store:()=>A.store(),scan:()=>{ if(!S.storeOn) A.store(); openSheet('scan',a); },ask:()=>A.ask(a),storeFinish:()=>A.storeFinish(),addPlan:()=>A.addPlan(),addEggs:()=>A.addEggs()})[k](); },
-  onbGo(v){ ui.onb=+v; if(ui.onb>=6){ S.onboarded=true; ui.onb=0; if(S.startValue==null) S.startValue=listTotal(); toast('Household set up. Estimates ready.'); } render(); },
-  hh(v,e){ const lim={adults:[1,6],kids:[0,6],laundry:[1,14]}[v]; S.hh[v]=Math.min(lim[1],Math.max(lim[0],S.hh[v]+ +e.dataset.d)); if(v==='laundry') S.ess.detergent.dur=Math.max(7,Math.round(16/S.hh.laundry)*7); render(); },
+  onbGo(v){ ui.onb=+v; if(ui.onb>=7){ S.onboarded=true; ui.onb=0; if(S.startValue==null) S.startValue=listTotal(); toast(L('Household set up. Estimates ready.','Foyer configuré. Estimations prêtes.')); } render(); },
+  setLang(v){ S.lang=v; render(); toast(v==='fr'?'Langue : français':'Language: English'); },
+  manual(v){ ui.man={n:'',store:L('Other store','Autre magasin'),kind:v||'food',q:'',exp:3,weeks:4,opened:0,e:'📦'}; openSheet('manual'); },
+  manSet(v,e){ const m=ui.man; if(v==='exp') m.exp=Math.max(0,Math.min(60,m.exp+ +e.dataset.d)); else if(v==='weeks') m.weeks=Math.max(1,Math.min(26,m.weeks+ +e.dataset.d)); else m[v]=v==='opened'?+e.dataset.d:e.dataset.d; render(); },
+  manSave(){ const m=ui.man; if(!m.n.trim()) return; const id='c'+Date.now(); S.custom[id]={n:m.n.trim(),store:m.store.trim()||L('Other store','Autre magasin'),kind:m.kind,q:m.q.trim(),e:m.e}; registerCustom();
+    if(m.kind==='food') S.pantry.push({id,q:m.q.trim()||'—',exp:S.day+m.exp,src:S.custom[id].store}); else S.ess[id]={dur:m.weeks*7,opened:m.opened-S.day,remind:true};
+    ui.sheet=null; toast(L(`${m.n.trim()} added`,`${m.n.trim()} ajouté`)); render(); },
+  customBought(v){ S.ess[v].opened=-S.day; toast(L('Estimate restarted from today','Estimation relancée à partir d’aujourd’hui')); render(); },
+  customRemove(v){ delete S.ess[v]; delete S.custom[v]; S.pantry=S.pantry.filter(p=>p.id!==v); toast(L('Removed','Supprimé')); render(); },
+  hh(v,e){ const lim={adults:[1,6],kids:[0,6],laundry:[1,14],dishRuns:[1,14]}[v]; S.hh[v]=Math.min(lim[1],Math.max(lim[0],S.hh[v]+ +e.dataset.d)); if(v==='laundry') S.ess.detergent.dur=Math.max(7,Math.round(16/S.hh.laundry)*7); if(v==='dishRuns') S.ess.dishtabs.dur=Math.max(7,Math.round(40/S.hh.dishRuns)*7); render(); },
   hhSet(v,e){ let d=e.dataset.d; d=d==='true'?true:d==='false'?false:isNaN(+d)?d:+d; S.hh[v]=d; render(); },
   durStep(v,e){ S.ess[v].dur=Math.max(7,Math.min(70,S.ess[v].dur+ +e.dataset.d)); render(); },
 };
@@ -1233,11 +1464,14 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('input',e=>{
   if(e.target.id==='shopq'){ ui.q=e.target.value; render(); }
-  if(e.target.type==='range'&&e.target.dataset.a==='setDur'){ S.ess[e.target.dataset.v].dur=+e.target.value; $('durlbl').textContent=Math.round(e.target.value/7*10)/10+' weeks'; }
+  if(e.target.id==='set-name'){ S.name=e.target.value||'Léa'; render(); }
+  if(e.target.id==='onb-name'){ S.name=e.target.value; render(); }
+  if(e.target.id&&e.target.id.startsWith('man-')&&ui.man){ ui.man[e.target.id.slice(4)]=e.target.value; render(); }
+  if(e.target.type==='range'&&e.target.dataset.a==='setDur'){ S.ess[e.target.dataset.v].dur=+e.target.value; $('durlbl').textContent=T(Math.round(e.target.value/7*10)/10+' weeks'); }
 });
 document.addEventListener('change',e=>{
   const t=e.target;
-  if(t.dataset.a==='setOpened'){ S.ess[t.dataset.v].opened=+t.value; render(); }
+  if(t.dataset.a==='setOpened'){ S.ess[t.dataset.v].opened=+t.value-S.day; render(); }
   if(t.dataset.a==='setDur'){ render(); }
 });
 function layout(){ const m=innerWidth<=640||(matchMedia('(pointer:coarse)').matches&&innerWidth<900); document.documentElement.classList.toggle('is-mobile',m);
